@@ -1,0 +1,75 @@
+ARS perl - Perl5 / ARS2.0 integration kit
+
+    Copyright (C) 1995 Joel Murphy, jmurphy@acsu.buffalo.edu
+                       Jeff Murphy, jcmurphy@acsu.buffalo.edu
+
+    This program is free software; you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation; either version 2 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program; if not, write to the Free Software
+    Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+
+    Comments to: arsperl@smurfland.cit.buffalo.edu
+
+---------------------------------------------------------------------------
+
+This is a perl extension for Remedy's Action Request System. Remedy
+Corporation, Action Request System, and AR System are trademarks of Remedy 
+Corporation.
+
+This extension is beta, is offered completely for free and without support
+of any. Use at you own risk!  
+
+PREPARATION
+
+You will need to have these already installed: 
+
+   o  ARS 2.0 with API libraries.
+   o  Perl 5.0 with the dynamic loading option compiled in.
+
+TESTED OS'S
+
+This extension has been successfully built and used under the following 
+OS versions:
+
+   o  Solaris 2.4, 2.5
+
+Users of other OS's might encounted problems with compiling. We'd be 
+interested in hearing about your experiences and if you got it working
+under a new OS. 
+
+BUILDING
+
+To build the extension, change into the root directory of the distribution
+and edit the Makefile.PL file. Change the following lines in it to point to
+the location of your ARS API directory (e.g. /u/remedy/api/lib)
+
+$ARS_LDPATH = "-L/ware/ars/api/lib";
+$INCLUDES = "-I/ware/ars/api/include";
+
+and execute the following comands:
+
+> perl Makefile.PL
+> make
+> make install
+
+The first command will construct a Makefile. For the actual compile, an 
+ANSI compatible C compiler is needed. We use GCC (2.7.0). The third command
+might require special (i.e. root) access if your installed perl
+distribution is not owned by your userid.  If you want to disable memory
+deallocation with free, then add -DWASTE_MEM to the 'DEFINE' in writemakefile.
+
+This is all that it takes to build and install the extension. Oh yeah... 
+and a little luck too. :)
+
+
+
+

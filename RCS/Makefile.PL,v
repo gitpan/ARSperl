@@ -1,0 +1,61 @@
+head	1.2;
+access;
+symbols;
+locks
+	jmurphy:1.2; strict;
+comment	@% @;
+
+
+1.2
+date	96.03.28.02.16.01;	author jcmurphy;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	96.02.21.20.17.48;	author jmurphy;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.2
+log
+@ll
+nada
+@
+text
+@#!/usr/local/bin/perl
+
+use ExtUtils::MakeMaker;
+
+$ARS_LDPATH = "-L/usr/ars/api/lib";
+$INCLUDES = "-I/usr/ars/api/include";
+$ARS_LIBS = "-lar -lnsl";
+
+WriteMakefile(
+	      'NAME'	=> 'ARS',
+	      'VERSION'	=> '1.2',
+	      'LIBS'	=> ["${ARS_LDPATH} ${ARS_LIBS}"],
+	      'DEFINE'	=> '-g',
+	      'OBJECT'  => "ARS.o",
+	      'INC'	=> "${INCLUDES}",
+);
+@
+
+
+1.1
+log
+@Initial revision
+@
+text
+@d5 2
+a6 2
+$ARS_LDPATH = "-L/ware/ars/api/lib";
+$INCLUDES = "-I/ware/ars/api/include";
+d11 1
+a11 1
+	      'VERSION'	=> '1.1beta',
+@

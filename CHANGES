@@ -1,0 +1,22 @@
+CHANGES for ARSperl
+
+Revision history for ARSperl.
+
+MM/DD/YY
+=======================================================================
+#######################################################################
+=======================================================================
+01/12/96	(1.0beta)
+
+   o  (JWM) First release 
+
+   o  (JCM) Installation, hisory, and Gnu documentation added.
+            Removed -lars from makefile (internal C library that wasn't
+            released), not needed for arsperl.
+
+   o  (JCM) Added example scripts and html documentation.
+
+=======================================================================
+#######################################################################
+=======================================================================
+arsperl@smurfland.cit.buffalo.edu
