@@ -21,6 +21,18 @@
 #    Comments to: arsperl@smurfland.cit.buffalo.edu
 #
 # $Log: ARS.pm,v $
+# Revision 1.29  1998/03/31 15:54:25  jcmurphy
+# version=1.56
+#
+# Revision 1.28  1998/02/13 18:46:24  jcmurphy
+# 1.55
+#
+# Revision 1.27  1998/02/09 17:58:08  jcmurphy
+# updated version to 1.54
+#
+# Revision 1.26  1998/02/09 17:57:22  jcmurphy
+# fixed bug in ars_EncodeDiary()
+#
 # Revision 1.25  1997/11/26 20:06:48  jcmurphy
 # 1.53
 #
@@ -161,7 +173,7 @@ ars_GetControlStructFields ars_GetVUI
 $ars_errstr %ARServerStats %ars_errhash
 );
 
-$VERSION   = '1.53';
+$VERSION   = '1.56';
 $DEBUGGING = 0;
 
 bootstrap ARS $VERSION;
@@ -368,10 +380,10 @@ sub ars_decodeStatusHistory {
 #define AR_DEFN_DIARY_COMMA      '\04'     /* char between date/user/text */
 
 # ROUTINE
-#   ars_EncodeDiary(timestamp, username, value, timestamp, username, value, ...)
+#   ars_EncodeDiary(diaryhash1, diaryhash2, ...)
 #
 # DESCRIPTION
-#   given a list of timestamp, username and value triplets, 
+#   given a list of diary hashs (see ars_GetEntry), 
 #   encode them into an ars-internal diary string. this can 
 #   then be fed into ars_MergeEntry() in order to alter the contents
 #   of an existing diary entry.
@@ -382,9 +394,10 @@ sub ars_decodeStatusHistory {
 
 sub ars_EncodeDiary {
     my ($diary_string) = undef;
+    my ($entry);
     foreach $entry (@_) {
-	$diary_string .= pack("c",4) if ($diary_string);
-	$diary_string .= $entry->{timestamp}.pack("c",3).$entry->{user}.pack("c",3).$entry->{value}
+	$diary_string .= $entry->{timestamp}.pack("c",4).$entry->{user}.pack("c",4).$entry->{value};
+	$diary_string .= pack("c",3) if ($diary_string);
     }
     return $diary_string;
 }

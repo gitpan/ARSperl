@@ -28,7 +28,7 @@ use ExtUtils::MakeMaker;
 
 $ARSAPI     = "/usr/ars/api";
 
-#$ARSAPI     = "/u1/project/ARSperl/api/sol2/api2.1";
+#$ARSAPI     = "/u1/project/ARSperl/api/sol2/api3.0";
 $ARS_LDPATH = "-L$ARSAPI/lib";
 $INCLUDES   = "-I$ARSAPI/include";
 

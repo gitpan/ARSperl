@@ -1,5 +1,5 @@
 /*
-$Header: /u1/project/ARSperl/ARSperl/RCS/support.c,v 1.12 1997/12/15 21:25:39 jcmurphy Exp $
+$Header: /u1/project/ARSperl/ARSperl/RCS/support.c,v 1.18 1998/03/31 15:51:25 jcmurphy Exp $
 
     ARSperl - An ARS2.x-3.0 / Perl5.x Integration Kit
 
@@ -29,6 +29,26 @@ $Header: /u1/project/ARSperl/ARSperl/RCS/support.c,v 1.12 1997/12/15 21:25:39 jc
     LOG:
 
 $Log: support.c,v $
+Revision 1.18  1998/03/31 15:51:25  jcmurphy
+oops. that wasn't unused code.
+
+Revision 1.16  1998/03/12 20:46:17  jcmurphy
+fixes to decoding the values that are assigned to a field
+when performing a setfields operation in active links
+and filters.
+
+Revision 1.15  1998/03/11 14:09:25  jcmurphy
+fixed bug in macroParm
+
+Revision 1.14  1998/02/25 19:22:43  jcmurphy
+applied fixes to dup_FieldValueOrArith to handle
+AR_FIELD_CURRENT, FIELD_TRAN and _DB
+
+Revision 1.13  1998/02/13 18:44:34  jcmurphy
+patched BuildEntryIdList by Ulrich Pfeifer <pfeifer@wait.de>
+patch includes strncpy and terminating null to make it
+more robust.
+
 Revision 1.12  1997/12/15 21:25:39  jcmurphy
 /1.53
 
@@ -472,10 +492,71 @@ perl_dataType_names(_AWPC_ unsigned int *in) {
   return newSVpv(VNAME("NULL"));
 }
 
+/* this one is for decoding assign (set) field actions in active links
+ * and/or filters.
+ */
+
+SV *
+perl_ARValueStructType_Assign(_AWPC_ ARValueStruct *in) {
+  return perl_dataType_names(_PPERLC_ &(in->dataType));
+}
+
 SV *
 perl_ARValueStructType(_AWPC_ ARValueStruct *in) {
   return perl_dataType_names(_PPERLC_ &(in->dataType));
 }
+
+/* this one is for decoding assign (set) field actions in active links
+ * and/or filters.
+ */
+
+SV *
+perl_ARValueStruct_Assign(_AWPC_ ARValueStruct *in) {
+  ARDiaryList  diaryList;
+  ARStatusList status;
+  int          ret, i;
+  
+  ZEROMEM(&status, ARStatusList);
+
+  switch (in->dataType) {
+  case AR_DATA_TYPE_KEYWORD:
+    for(i = 0 ; KeyWordMap[i].number != TYPEMAP_LAST ; i++) {
+      if(KeyWordMap[i].number == in->u.keyNum)
+	break;
+    }
+    return newSVpv(KeyWordMap[i].name, KeyWordMap[i].len);
+    break;
+  case AR_DATA_TYPE_INTEGER:
+    return newSViv(in->u.intVal);
+  case AR_DATA_TYPE_REAL:
+    return newSVnv(in->u.realVal);
+  case AR_DATA_TYPE_DIARY: /* this is the set-fields special case */
+  case AR_DATA_TYPE_CHAR:
+    return newSVpv(in->u.charVal, 0);
+  case AR_DATA_TYPE_ENUM:
+    return newSViv(in->u.enumVal);
+  case AR_DATA_TYPE_TIME:
+    return newSViv(in->u.timeVal);
+  case AR_DATA_TYPE_BITMASK:
+    return newSViv(in->u.maskVal);
+#if AR_EXPORT_VERSION >= 3
+  case AR_DATA_TYPE_BYTES:
+    return perl_ARByteList(_PPERLC_ in->u.byteListVal);
+  case AR_DATA_TYPE_ULONG:
+    return newSViv(in->u.ulongVal); /* FIX -- does perl have unsigned long? */
+  case AR_DATA_TYPE_COORDS:
+      return perl_ARList(_PPERLC_
+			 (ARList *)in->u.coordListVal,
+			 (ARS_fn)perl_ARCoordStruct,
+			 sizeof(ARCoordStruct));
+#endif
+  case AR_DATA_TYPE_NULL:
+  default:
+    return newSVsv(&sv_undef); /* FIX */
+  }
+}
+
+/* this one is for "normal" field/value decoding */
 
 SV *
 perl_ARValueStruct(_AWPC_ ARValueStruct *in) {
@@ -484,6 +565,7 @@ perl_ARValueStruct(_AWPC_ ARValueStruct *in) {
   int          ret, i;
   
   ZEROMEM(&status, ARStatusList);
+
   switch (in->dataType) {
   case AR_DATA_TYPE_KEYWORD:
     for(i = 0 ; KeyWordMap[i].number != TYPEMAP_LAST ; i++) {
@@ -500,9 +582,9 @@ perl_ARValueStruct(_AWPC_ ARValueStruct *in) {
     return newSVpv(in->u.charVal, 0);
   case AR_DATA_TYPE_DIARY:
     ret = ARDecodeDiary(_PPERLC_ in->u.diaryVal, &diaryList, &status);
-    if (ARError(_PPERLC_ ret, status))
+    if (ARError(_PPERLC_ ret, status)) {
       return newSVsv(&sv_undef);
-    else {
+    } else {
       SV *array;
       array = perl_ARList(_PPERLC_
 			  (ARList *)&diaryList,
@@ -683,7 +765,7 @@ perl_ARMacroParmList(_AWPC_ ARMacroParmList *in) {
   int i;
 
   for (i=0; i<in->numItems; i++)
-    hv_store(hash, VNAME(in->parms[i].name), newSVpv(in->parms[0].value, 0), 0);
+    hv_store(hash, VNAME(in->parms[i].name), newSVpv(in->parms[i].value, 0), 0);
 
   return newRV((SV *)hash);
 }
@@ -1008,13 +1090,21 @@ perl_ARAssignStruct(_AWPC_ ARAssignStruct *in) {
   /* we will also be storing the specific AR_DATA_TYPE_* since
    * this is used in the rev_* routines to translate back.
    * we wouldnt be able to derive the datatype in any
-   * other fashion.
+   * other fashion. 
    */
 
+    /* 1998-03-12 patch
+     * the assign struct stores assign field actions on diary
+     * fields as character assignments (makes sense). but this
+     * means we can't use the standard perl_ARValueStruct call
+     * to decode. we need to have a 'special' one that will
+     * decode DIARY or CHAR types as if they are both CHAR types.
+     */
+
     hv_store(hash, VNAME("value"),
-	     perl_ARValueStruct(_PPERLC_ &in->u.value), 0);
+	     perl_ARValueStruct_Assign(_PPERLC_ &in->u.value), 0);
     hv_store(hash, VNAME("valueType"),
-	     perl_ARValueStructType(_PPERLC_ &in->u.value), 0);
+	     perl_ARValueStructType_Assign(_PPERLC_ &in->u.value), 0);
     break;
   case AR_ASSIGN_TYPE_FIELD:
     hv_store(hash, VNAME("field"),
@@ -1201,7 +1291,9 @@ perl_BuildEntryList(_AWPC_ AREntryIdList *entryList, char *entry_id)
 
       if((tok = strtok(eid_dup, eidSep))) {
 	for(tn = 0; tn < entryList->numItems ; tn++) {
-	  strcpy(entryList->entryIdList[tn], tok);
+	  /* patch by Ulrich Pfeifer <pfeifer@wait.de> */
+	  strncpy(entryList->entryIdList[tn], tok, sizeof(AREntryIdType));
+	  *(entryList->entryIdList[tn]+AR_MAX_ENTRYID_SIZE+1) = '\0';
 	  tok = strtok((char *)NULL, eidSep);
 	}
 	FREE(eid_orig);
@@ -1449,6 +1541,9 @@ dup_FieldValueOrArith(_AWPC_ ARFieldValueOrArithStruct *n,
   n->tag = in->tag;
 
   switch (in->tag) {
+  case AR_FIELD_CURRENT:
+  case AR_FIELD_TRAN:
+  case AR_FIELD_DB:
   case AR_FIELD:
     n->u.fieldId = in->u.fieldId;
     break;

@@ -1,4 +1,4 @@
-$Header: /u1/project/ARSperl/ARSperl/RCS/CHANGES,v 1.15 1997/12/15 21:01:58 jcmurphy Exp $
+$Header: /u1/project/ARSperl/ARSperl/RCS/CHANGES,v 1.20 1998/03/30 19:00:19 jcmurphy Exp jcmurphy $
 
 CHANGES for ARSperl
 
@@ -8,7 +8,49 @@ MM/DD/YY
 =======================================================================
 #######################################################################
 =======================================================================
-xx/yy/zz        (1.53)
+03/31/98        (1.55)
+
+  o (JCM)  fixed a problem caused by some debugging code that
+           was left in 1.55 accidentally.
+
+=======================================================================
+#######################################################################
+=======================================================================
+03/30/98        (1.55)
+
+  o (JCM)  added ars_GetListEntry.pl example to show how to use
+           custom query-list fields.
+
+  o (JCM)  numerous documentation updates by D.J.Adams@soton.ac.uk
+
+  o (JCM)  fixed bug in macroParm decoding. (D.J.Adams@soton.ac.uk)
+
+  o (JCM)  fixed bug when decoding results of GetFilter/GetActiveLink
+           in regards to set fields actions: values assigned to
+           diary fields were not being interpretted correctly.
+           (D.J.Adams@soton.ac.uk)
+
+  o (JCM)  patched perl_BuildEntryIdList to make it more robust
+           (Ulrich Pfeifer <pfeifer@wait.de>)
+
+  o (JCM)  patched ars_GetCharMenu for bug "GetCharMenu doesn't
+           return a qualifier for query menus" (D.J.Adams@soton.ac.uk)
+
+  o (JCM)  fixed dup_FieldValueOrArith to support decoding of
+           query style menus. 
+
+=======================================================================
+#######################################################################
+=======================================================================
+02/09/98        (1.54)
+ 
+  o (JCM)  fixed bug in ars_EncodeDiary()
+  o (JCM)  added ars_MergeEntry.pl example script
+
+=======================================================================
+#######################################################################
+=======================================================================
+12/15/97        (1.53)
 
   o (JCM)  fixed some minor errors in doc
 

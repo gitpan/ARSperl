@@ -30,3 +30,7 @@ ARSetVUI
 
    o examine perl_ARFieldLimitStruct(). sometimes it returns
 	a HASH ref, sometimes an ARRAY ref
+
+   o change return val if ars_DeleteEntry() so that 
+     ars_DeleteEntry() || die works.
+
