@@ -11,6 +11,20 @@ previous versions of arsperl and may require altering of some arsperl
 scripts.
 
 
+Released: 10/30/2000 Version: 1.71
+
+
+(JCM)   modified support-h.template to compile against api3.0
+
+
+Released: 9/21/2000 Version: 1.70
+
+
+(JCM)   modified support-h.template to compile against api3.2
+
+(JCM)   bug fix to ars_Import()
+
+
 Released: 8/31/2000 Version: 1.69
 
 
@@ -524,5 +538,5 @@ Released: 01/12/96 Version: 1.0beta
 
 arsperl@arsperl.org
 
-$Header: /cvs/ARSperl/CHANGES,v 1.39 2000/08/31 20:54:58 jcmurphy Exp $
+$Header: /cvs/ARSperl/CHANGES,v 1.42 2000/10/30 19:49:16 jcmurphy Exp $
 

@@ -1,5 +1,5 @@
 /*
-$Header: /cvs/ARSperl/ARS.xs,v 1.72 2000/08/31 05:31:16 jcmurphy Exp $
+$Header: /cvs/ARSperl/ARS.xs,v 1.75 2000/09/29 16:18:54 jcmurphy Exp $
 
     ARSperl - An ARS v2 - v4 / Perl5 Integration Kit
 
@@ -1135,6 +1135,42 @@ ars_GetActiveLink(ctrl,name)
 	OUTPUT:
 	RETVAL
 
+int
+ars_SetFilter(ctrl,filterDefRef)
+	ARControlStruct *	ctrl
+	SV		*	filterDefRef
+	CODE:
+	{
+		ARStatusList       status;
+		ARFilterActionList actionList;
+#if AR_EXPORT_VERSION >= 3
+		ARFilterActionList  elseList;
+#endif
+		RETVAL = 1;
+		(void) ARError_reset();
+		Zero(&status, 1, ARStatusList);
+		Zero(&actionList, 1, ARFilterActionList);
+#if AR_EXPORT_VERSION >= 3
+		Zero(&elseList, 1, ARFilterActionList);
+#endif
+	/*
+	char *name
+	char *newName
+	unsigned int order
+	char *schema
+	unsigned int opSet
+	unsigned int enabled
+	ARQualifierStruct *query
+	ARFilterActionList *actionList
+	ARFilterActionList *elseList
+	char *helpText
+	char *owner
+	char *changeDiary
+	*/
+	}
+	OUTPUT:
+	RETVAL
+
 HV *
 ars_GetFilter(ctrl,name)
 	ARControlStruct *	ctrl
@@ -1944,7 +1980,7 @@ ars_Import(ctrl,importOption=AR_IMPORT_OPT_CREATE,importBuf,...)
 				     ARStructItemStruct);
 				for (i = 0; i < c; i++) {
 					unsigned int et = 0;
-					a  = i*2+2;
+					a  = i*2+3;
 					et = caseLookUpTypeNumber((TypeMapStruct *) 
 								     StructItemTypeMap,
 								   SvPV(ST(a), PL_na) 
@@ -1975,6 +2011,8 @@ ars_Import(ctrl,importOption=AR_IMPORT_OPT_CREATE,importBuf,...)
 			((ars_ctrl *)ctrl)->queries++;
 #endif
 			if (ARError(ret, status)) {
+				RETVAL = 0;
+			} else {
 				RETVAL = 1;
 			}
 		} else {
