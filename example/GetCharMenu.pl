@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl
 #
-# $Header: /cvs/ARSperl/example/GetCharMenu.pl,v 1.6 2000/05/24 18:05:26 jcmurphy Exp $
+# $Header: /cvs/ARSperl/example/GetCharMenu.pl,v 1.5 1998/10/14 13:55:34 jcmurphy Exp $
 #
 # NAME
 #   GetCharMenu.pl
@@ -16,9 +16,6 @@
 #   jcmurphy@acsu.buffalo.edu
 #
 # $Log: GetCharMenu.pl,v $
-# Revision 1.6  2000/05/24 18:05:26  jcmurphy
-# primary ars4.5 integration in this checkpoint.
-#
 # Revision 1.5  1998/10/14 13:55:34  jcmurphy
 # fixed syntax error
 #
@@ -67,10 +64,6 @@ $ctrl = ars_Login($server, $username, $password);
 ($finfo = ars_GetCharMenu($ctrl, $name)) ||
     die "error in GetCharMenu: $ars_errstr";
 
-# 10005
-my ($menuItems) = undef; #ars_GetCharMenuItems($ctrl, $name);
-print "menuItems $menuItems\n";
-
 print "** Menu Info:\n";
 print "Name        : \"".$finfo->{"name"}."\"\n";
 print "helpText    : ".$finfo->{"helpText"}."\n";
@@ -86,15 +79,10 @@ foreach (@{$finfo->{"changeDiary"}}) {
 }
 
 print "refreshCode : ".$finfo->{"refreshCode"}."\n";
-print "menuType    : ".$finfo->{"menuType"}."\n";
+print "menuType    : ".
+    ("None", "List", "Query", "File", "SQL")[$finfo->{"menuType"}]." ($finfo->{menuType})\n";
 
-if($finfo->{menuType} eq "query") {
-
-	ARS::insertValueForCurrentTransaction($ctrl, 
-					 $finfo->{'menuQuery'}{'schema'},
-					 $finfo->{'menuQuery'}{'qualifier'});
-
-
+if($finfo->{menuType} == 2) {
     print "menuQuery definitions:\n";
     print "\tschema      : ".$finfo->{menuQuery}{schema}."\n";
     print "\tserver      : ".$finfo->{menuQuery}{server}."\n";
@@ -102,7 +90,7 @@ if($finfo->{menuType} eq "query") {
     print "\tvalueField  : ".$finfo->{menuQuery}{valueField}."\n";
     print "\tsortOnLabel : ".$finfo->{menuQuery}{sortOnLabel}."\n";
     print "\tquery       : ".$finfo->{menuQuery}{qualifier}."\n";
-    $dq = ars_perl_qualifier($ctrl, $finfo->{menuQuery}{qualifier});
+    $dq = ars_perl_qualifier($finfo->{menuQuery}{qualifier});
     $qualtext = ars_Decode_QualHash($ctrl, 
 				    $finfo->{menuQuery}{schema}, 
 				    $dq);
@@ -110,13 +98,13 @@ if($finfo->{menuType} eq "query") {
 
 }
 
-elsif($finfo->{menuType} eq "file") {
+elsif($finfo->{menuType} == 3) {
     print "menuFile definitions:\n";
     print "\tfileLocation  : ".("", "Server", "Client")[$finfo->{menuFile}{fileLocation}]."\n";
     print "\tfilename      : ".$finfo->{menuFile}{filename}."\n";
 }
 
-elsif($finfo->{menuType} eq "sql") {
+elsif($finfo->{menuType} == 4) {
     print "menuSQL definitions:\n";
     print "\tserver      : ".$finfo->{menuSQL}{server}."\n";
     print "\tsqlCommand  : ".$finfo->{menuSQL}{sqlCommand}."\n";
@@ -124,27 +112,7 @@ elsif($finfo->{menuType} eq "sql") {
     print "\tvalueIndex  : ".$finfo->{menuSQL}{valueIndex}."\n";
 }
 
-print "Menu Items  :\n";
-printMenuItems(1, $menuItems);
-print "Simple Menu : (with 'prepend' = false)\n";
-print "\t", join("\n\t", ars_simpleMenu($menuItems, 0)), "\n";
-print "Simple Menu : (with 'prepend' = true)\n";
-print "\t", join("\n\t", ars_simpleMenu($menuItems, 1)), "\n";
-
 ars_Logoff($ctrl);
 
 exit 0;
 
-sub printMenuItems {
-	my ($l, $m) = (shift, shift);
-	my ($i) = 0;
-	for ($i = 0 ; $i <= $#$m ; $i += 2) {
-		printl($l, $m->[$i]);
-		if(ref($m->[$i+1]) eq "ARRAY") {
-			print "\n";
-			printMenuItems($l+1, $m->[$i+1]);
-		} else {
-			print " -> ".$m->[$i+1]."\n";
-		}
-	}
-}

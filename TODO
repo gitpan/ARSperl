@@ -1,4 +1,6 @@
-Container Calls
+ARStatusStruct :
+                  char         *appendedText;
+
 
 ARSperl todo list:
 
@@ -70,6 +72,4 @@ and:
    @SYBASE_QUERY would be something like this:
    select Ticket_No from Schema_Name
    WHERE Field = '$value'
-
-
 

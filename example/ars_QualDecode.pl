@@ -1,5 +1,5 @@
 #
-# $Header: /cvs/ARSperl/example/ars_QualDecode.pl,v 1.7 2000/06/01 16:54:03 jcmurphy Exp $
+# $Header: /cvs/ARSperl/example/ars_QualDecode.pl,v 1.6 1998/04/20 17:13:25 jcmurphy Exp $
 #
 # MODULE
 #   ars_QualDecode.pl
@@ -14,9 +14,6 @@
 #   jeff murphy
 #
 # $Log: ars_QualDecode.pl,v $
-# Revision 1.7  2000/06/01 16:54:03  jcmurphy
-# *** empty log message ***
-#
 # Revision 1.6  1998/04/20 17:13:25  jcmurphy
 # patch by jkeener@utsi.com for
 # "case where value = undef (NULL)."
@@ -67,29 +64,19 @@ sub ars_Decode_QualHash {
     my %fids_orig;
     my $fieldName;
 
-    print "ars_Decode_QualHash(c=$c, s=$s, q=$q)\n" if !$debug;
+    print "ars_Decode_QualHash(c=$c, s=$s, q=$q)\n" if $debug;
 
-    if(!(defined($c) && (ref($c) eq "ARControlStructPtr"))) {
-	    print "ars_Decode_QualHash: ctrl is not an ARControlStructPtr\n";
-	    return undef;
-    }
-
-    if(!(defined($s) && ($s ne ""))) {
-	    print "ars_Decode_QualHash: schema is not a SCALAR\n";
-	    return undef;
-    }
-
-    if(!(defined($q) && (ref($q) eq "HASH"))) {
-	    print "ars_Decode_QualHash: qualifier is not a HASH\n";
-	    return undef;
-    }
-
-    (%fids_orig = ars_GetFieldTable($c, $s)) ||
-      die "GetFieldTable: $ars_errstr";
-    foreach $fieldName (keys %fids_orig) {
+    if($c && $s && $q) {
+	(%fids_orig = ars_GetFieldTable($c, $s)) ||
+	    die "GetFieldTable: $ars_errstr";
+	foreach $fieldName (keys %fids_orig) {
 	    $fids{$fids_orig{$fieldName}} = $fieldName;
+	}
+	return ars_DQH($q, %fids);
     }
-    return ars_DQH($q, %fids);
+    print "WARNING: ars_Decode_QualHash: invalid params\n";
+
+    return undef;
 }
 
 sub ars_DQH {

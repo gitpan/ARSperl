@@ -1,5 +1,5 @@
 /*
-$Header: /cvs/ARSperl/supportrev.c,v 1.16 2000/07/03 14:58:29 jcmurphy Exp $
+$Header: /cvs/ARSperl/supportrev.c,v 1.12 1999/10/03 04:00:27 jcmurphy Exp $
 
     ARSperl - An ARS v2 - v4 / Perl5 Integration Kit
 
@@ -24,18 +24,6 @@ $Header: /cvs/ARSperl/supportrev.c,v 1.16 2000/07/03 14:58:29 jcmurphy Exp $
     LOG:
 
 $Log: supportrev.c,v $
-Revision 1.16  2000/07/03 14:58:29  jcmurphy
-*** empty log message ***
-
-Revision 1.15  2000/06/03 00:41:41  jcmurphy
-*** empty log message ***
-
-Revision 1.14  2000/06/01 16:54:03  jcmurphy
-*** empty log message ***
-
-Revision 1.13  2000/05/24 18:05:25  jcmurphy
-primary ars4.5 integration in this checkpoint.
-
 Revision 1.12  1999/10/03 04:00:27  jcmurphy
 various
 
@@ -155,30 +143,6 @@ rev_ARPropList_helper(ARControlStruct * ctrl,
 #endif
 
 /* ROUTINE
- *   revTypeName(TypeMapStruct *tms, char *type)
- *
- * DESCRIPTION
- *   given a typemapstruct and a string, return the 
- *   enumeration value if string exists in struct.
- *
- * RETURNS
- *   >=0 on success
- *   TYPEMAP_LAST on failure
- */
-
-unsigned int
-revTypeName(TypeMapStruct *t, char *type) 
-{
-	if(type && *type && t) {
-		int i = 0;
-		while((t[i].number != TYPEMAP_LAST) && strcmp(t[i].name, type))
-			i++;
-		return t[i].number;
-	}
-	return TYPEMAP_LAST;
-}
-
-/* ROUTINE
  *   strcpyHVal(hash, key, buffer, bufferLen)
  *
  * DESCRIPTION
@@ -212,7 +176,7 @@ strcpyHVal(HV * h, char *k, char *b, int len)
 			val = hv_fetch(h, VNAME(k), 0);
 			if (val && *val) {
 				if (SvPOK(*val)) {
-					strncpy(b, SvPV(*val, PL_na), len);
+					strncpy(b, SvPV(*val, na), len);
 					b[len] = 0;
 					return 0;
 				} else
@@ -222,14 +186,12 @@ strcpyHVal(HV * h, char *k, char *b, int len)
 				ARError_add(AR_RETURN_WARNING, AP_ERR_GENERAL,
 				"strcpyHVal: hv_fetch returned null. key:");
 				ARError_add(AR_RETURN_WARNING, AP_ERR_CONTINUE,
-					    k ? k : "[key null]");
+					    k ? k : "n/a");
 				return -2;
 			}
 		} else {
 			ARError_add(AR_RETURN_WARNING, AP_ERR_GENERAL,
-				    "strcpyHVal: key doesn't exist. key specified in next message:");
-			ARError_add(AR_RETURN_WARNING, AP_ERR_CONTINUE,
-				    k ? k : "[key null]");
+				    "strcpyHVal: key doesn't exist");
 			return -2;
 		}
 	} else
@@ -1133,7 +1095,7 @@ rev_ARAssignSQLStruct(ARControlStruct * ctrl, HV * h, char *k, ARAssignSQLStruct
 	rv += uintcpyHVal(hr, "valueIndex", &(s->valueIndex));
 	svp = hv_fetch(hr, VNAME("noMatchOption"), 0);
 	if (svp && *svp) {
-		char           *c = SvPV(*svp, PL_na);
+		char           *c = SvPV(*svp, na);
 		if (rev_ARAssignFieldStructStr2NMO(ctrl, c, &(s->noMatchOption)) != 0) {
 			s->noMatchOption = AR_NO_MATCH_ERROR;
 			ARError_add(AR_RETURN_WARNING, AP_ERR_GENERAL,
@@ -1144,7 +1106,7 @@ rev_ARAssignSQLStruct(ARControlStruct * ctrl, HV * h, char *k, ARAssignSQLStruct
 	}
 	svp = hv_fetch(hr, VNAME("multiMatchOption"), 0);
 	if (svp && *svp) {
-		char           *c = SvPV(*svp, PL_na);
+		char           *c = SvPV(*svp, na);
 		if (rev_ARAssignFieldStructStr2MMO(ctrl, c, &(s->multiMatchOption)) != 0) {
 			s->multiMatchOption = AR_MULTI_MATCH_ERROR;
 			ARError_add(AR_RETURN_WARNING, AP_ERR_GENERAL,
@@ -1189,8 +1151,7 @@ rev_ARValueStruct(ARControlStruct * ctrl, HV * h, char *k, char *t, ARValueStruc
 	val = hv_fetch(h, VNAME(k), 0);
 	type = hv_fetch(h, VNAME(t), 0);
 	if (val && *val && type && *type && SvPOK(*type)) {
-		char           *tp = SvPV(*type, PL_na), 
-		               *vp = SvPV(*val,  PL_na);
+		char           *tp = SvPV(*type, na), *vp = SvPV(*val, na);
 
 		(void) rev_ARValueStructStr2Type(ctrl, tp, &(m->dataType));
 		switch (m->dataType) {
@@ -1384,8 +1345,8 @@ rev_ARByteList(ARControlStruct * ctrl, HV * h, char *k, ARByteList * b)
 				/* we are expecting two PV's */
 
 				if (SvPOK(*tv) && SvPOK(*vv)) {
-					char           *typeString = SvPV(*tv, PL_na);	/* SvPV is a macro */
-					char           *byteString = SvPV(*vv, PL_na);
+					char           *typeString = SvPV(*tv, na);	/* SvPV is a macro */
+					char           *byteString = SvPV(*vv, na);
 					int             byteLen = SvCUR(*vv);
 
 					if (rev_ARByteListStr2Type(ctrl, typeString, &(b->type)) == -1)
@@ -1404,13 +1365,13 @@ rev_ARByteList(ARControlStruct * ctrl, HV * h, char *k, ARByteList * b)
 			ARError_add(AR_RETURN_ERROR, AP_ERR_GENERAL,
 				    "rev_ARByteList: hash value is not hash ref for key:");
 			ARError_add(AR_RETURN_ERROR, AP_ERR_CONTINUE,
-				    k ? k : "[key null]");
+				    k);
 		}
 	} else {
 		ARError_add(AR_RETURN_WARNING, AP_ERR_GENERAL,
 			    "rev_ARByteList: hash key doesn't exist:");
 		ARError_add(AR_RETURN_WARNING, AP_ERR_CONTINUE,
-			    k ? k : "[key null]");
+			    k);
 		return -2;
 	}
 	return -1;
@@ -1611,13 +1572,13 @@ rev_ARAssignFieldStruct_helper(ARControlStruct * ctrl, HV * h, ARAssignFieldStru
 #if AR_EXPORT_VERSION >= 3
 	svp = hv_fetch(h, VNAME("noMatchOption"), 0);
 	if (svp && *svp) {
-		char           *c = SvPV(*svp, PL_na);
+		char           *c = SvPV(*svp, na);
 		if (rev_ARAssignFieldStructStr2NMO(ctrl, c, &(m->noMatchOption)) != 0)
 			m->noMatchOption = AR_NO_MATCH_ERROR;
 	}
 	svp = hv_fetch(h, VNAME("multiMatchOption"), 0);
 	if (svp && *svp) {
-		char           *c = SvPV(*svp, PL_na);
+		char           *c = SvPV(*svp, na);
 		if (rev_ARAssignFieldStructStr2MMO(ctrl, c, &(m->multiMatchOption)) != 0)
 			m->multiMatchOption = AR_MULTI_MATCH_ERROR;
 	}
@@ -1823,7 +1784,7 @@ rev_ARArithOpAssignStruct_helper(ARControlStruct * ctrl,
 
 	svp = hv_fetch(h, VNAME("oper"), 0);
 	if (svp && *svp) {
-		char           *c = SvPV(*svp, PL_na);
+		char           *c = SvPV(*svp, na);
 		if (rev_ARArithOpAssignStructStr2OP(ctrl, c, &(s->operation)) != 0)
 			return -1;
 	}
@@ -1912,7 +1873,7 @@ rev_ARFunctionAssignStruct(ARControlStruct * ctrl,
 					}
 					aval = av_fetch(a, 0, 0);	/* fetch function name */
 					if (aval && *aval && SvPOK(*aval)) {	/* must be a string */
-						char           *fn = SvPV(*aval, PL_na);
+						char           *fn = SvPV(*aval, na);
 						if (rev_ARFunctionAssignStructStr2FCODE(ctrl, fn, &(s->functionCode)) == -1)
 							return -1;
 					} else {
@@ -2052,44 +2013,9 @@ rev_ARMessageStruct(ARControlStruct * ctrl, HV * h, char *k, ARMessageStruct * m
 				if (SvTYPE(SvRV(*val)) == SVt_PVHV) {
 					HV             *a = (HV *) SvRV((SV *) * val);
 					int             rv = 0;
-					char           *str = NULL;
-
-					if(hv_exists(h, VNAME("messageType"))) {
-						SV **sval = hv_fetch(h, VNAME("messageType"), 0);
-						if(sval && *sval) {
-							if (SvPOK(*sval)) 
-								str = SvPV(*sval, PL_na);
-						}
-					} else {
-						ARError_add(AR_RETURN_WARNING, AP_ERR_GENERAL,
-							    "rev_ARMessageStruct: messageType key doesn't exist:");
-						return -1;
-					}
-
-
-					/* pre1-1.68 messageType was an int, from 1.68 on, it 
-					 * is a decoded string, so we need to re-encode from the string
-					 * value. previous code was:
-					 *
-					 * rv += uintcpyHVal(a, "messageType", &(m->messageType));
-					 *
-					 * new code follows (next 10 lines or so)
-					 */
-
-					m->messageType = 
-						revTypeName((TypeMapStruct *)StatusReturnTypeMap,
-							   str);
-
-					if(m->messageType == TYPEMAP_LAST) {
-						ARError_add(AR_RETURN_ERROR, AP_ERR_GENERAL,
-							    "rev_ARMessageStruct: messageType key invalid. key follows:");
-						ARError_add(AR_RETURN_WARNING, AP_ERR_CONTINUE,
-							    str ? str : "[key null]");
-
-						return -1;
-					}
 
 					rv += strmakHVal(a, "messageText", &(m->messageText));
+					rv += uintcpyHVal(a, "messageType", &(m->messageType));
 					rv += longcpyHVal(a, "messageNum", &(m->messageNum));
 					rv += boolcpyHVal(a, "usePromptingPane", &(m->usePromptingPane));
 
@@ -2370,7 +2296,7 @@ rev_ARMacroParmList(ARControlStruct * ctrl, HV * h, char *k, ARMacroParmList * m
 					i2 = 0;
 					while ((hval = hv_iternextsv(a, &hkey, &klen))) {
 						if (hval && SvPOK(hval)) {
-							char           *vv = SvPV(hval, PL_na);
+							char           *vv = SvPV(hval, na);
 							int             vl = SvCUR(hval);
 
 							if (i2 <= i) {
