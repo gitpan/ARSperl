@@ -1,9 +1,9 @@
 /*
 $header: /u1/project/ARSperl/ARSperl/RCS/support.c,v 1.25 1999/01/04 21:04:27 jcmurphy Exp jcmurphy $
 
-    ARSperl - An ARS v2 - v4 / Perl5 Integration Kit
+    ARSperl - An ARS v2 - v5 / Perl5 Integration Kit
 
-    Copyright (C) 1995-2000
+    Copyright (C) 1995-2003
 	Joel Murphy, jmurphy@acsu.buffalo.edu
         Jeff Murphy, jcmurphy@acsu.buffalo.edu
 
@@ -14,12 +14,11 @@ $header: /u1/project/ARSperl/ARSperl/RCS/support.c,v 1.25 1999/01/04 21:04:27 jc
     distribution of ARSperl (or the one that accompanies the source 
     distribution of Perl itself) for a full description.
 
-    Comments to:  arsperl@smurfland.cit.buffalo.edu
+    Comments to:  arsperl@arsperl.org
                   (this is a *mailing list* and you must be
                    a subscriber before posting)
 
-    Comments to: arsperl@lurch.cit.buffalo.edu
-    Home Page: http://arsinfo.cit.buffalo.edu
+    Home Page: http://www.arsperl.org
 
 */
 
@@ -122,13 +121,12 @@ debug_free(void *p, char *file, char *func, int line)
  *   negative int on failure
  */
 
-static HV      *err_hash = (HV *) NULL;
-
 int
 ARError_reset()
 {
 	SV             *ni, *t2, **t1;
 	AV             *t3;
+	HV             *err_hash = (HV *) NULL;
 
 	/* lookup hash, create if necessary */
 
@@ -196,6 +194,7 @@ ARError_add(unsigned int type, long num, char *text)
 	SV            **numItems, **messageType, **messageNum, **messageText;
 	AV             *a;
 	SV             *t2;
+	HV             *err_hash = (HV *) NULL;
 	unsigned int    ni, ret = 0;
 
 #ifdef ARSPERL_DEBUG
@@ -307,7 +306,7 @@ ARError(int returncode, ARStatusList status)
 
 	for (item = 0; item < status.numItems; item++) {
 #if AR_EXPORT_VERSION >= 4
-	        char *messageText = (char *)safemalloc(strlen(status.statusList[item].messageText) + 
+	        char *messageText = (char *)MALLOCNN(strlen(status.statusList[item].messageText) + 
 					     strlen(status.statusList[item].appendedText) + 4);
 		sprintf(messageText, "%s (%s)", 
 			status.statusList[item].messageText,
@@ -323,7 +322,7 @@ ARError(int returncode, ARStatusList status)
 				) != 0)
 			ret = 1;
 #if AR_EXPORT_VERSION >= 4
-		safefree(messageText);
+		AP_FREE(messageText);
 #endif
 	}
 
@@ -335,6 +334,8 @@ ARError(int returncode, ARStatusList status)
 	return ret;
 }
 
+
+#if AR_EXPORT_VERSION < 6
 /* same as ARError, just uses the NT structures instead */
 
 int
@@ -344,7 +345,7 @@ NTError(int returncode, NTStatusList status)
 
 	for (item = 0; item < status.numItems; item++) {
 #if AR_EXPORT_VERSION >= 4
-	        char *messageText = (char *)safemalloc(strlen(status.statusList[item].messageText) + 
+	        char *messageText = (char *)MALLOCNN(strlen(status.statusList[item].messageText) + 
 					     strlen(status.statusList[item].appendedText) + 4);
 		sprintf(messageText, "%s (%s)", 
 			status.statusList[item].messageText,
@@ -360,7 +361,7 @@ NTError(int returncode, NTStatusList status)
 				) != 0)
 			ret = 1;
 #if AR_EXPORT_VERSION >= 4
-		safefree(messageText);
+		AP_FREE(messageText);
 #endif
 	}
 
@@ -371,6 +372,8 @@ NTError(int returncode, NTStatusList status)
 
 	return ret;
 }
+#endif /* NT routines gone in ars 5.x */
+
 
 unsigned int
 caseLookUpTypeNumber(TypeMapStruct *t, char *s)
@@ -434,7 +437,7 @@ strappend(char *b, char *a)
 			t = (char *) MALLOCNN(strlen(b) + strlen(a) + 1);
 			if (t) {
 				strcpy(t, b);
-				FREE(b);
+				AP_FREE(b);
 				strcat(t, a);
 				b = t;
 			} else
@@ -462,6 +465,84 @@ perl_ARMessageStruct(ARControlStruct * ctrl, ARMessageStruct * in)
 	else
 		hv_store(hash,  "usePromptingPane", strlen("usePromptingPane") , newSViv(0), 0);
 
+	return newRV_noinc((SV *) hash);
+}
+#endif
+
+#if AR_EXPORT_VERSION >= 7L
+SV             *
+perl_AREnumItemStruct(ARControlStruct * ctrl, AREnumItemStruct * in)
+{
+	HV            *hash = newHV();
+
+	hv_store(hash, "itemName", strlen("itemName"),
+		 perl_ARNameType(ctrl, &(in->itemName)), 0);
+	hv_store(hash, "itemNumber", strlen("itemNumber"),
+		 newSViv(in->itemNumber), 0); /* unsigned long */
+
+	return newRV_noinc((SV *) hash);
+}
+
+SV             *
+perl_AREnumQueryStruct(ARControlStruct * ctrl, AREnumQueryStruct * in)
+{
+	HV            *hash = newHV();
+
+	hv_store(hash, "schema", strlen("schema"),
+		 perl_ARNameType(ctrl, &(in->schema)), 0);
+	hv_store(hash, "server", strlen("server"),
+		 newSVpv(in->server, 0), 0);
+	hv_store(hash, "qualifier", strlen("qualifier"),
+		 newRV_noinc((SV *) perl_qualifier(ctrl,
+						   &(in->qualifier))
+			     )
+		 ,0
+		 );
+	hv_store(hash, "nameField", strlen("nameField"),
+		 perl_ARInternalId(ctrl, &(in->nameField)), 0);
+	hv_store(hash, "numberField", strlen("numberField"),
+		 perl_ARInternalId(ctrl, &(in->numberField)), 0);
+
+	return newRV_noinc((SV *) hash);
+}
+
+SV             *
+perl_AREnumLimitsStruct(ARControlStruct * ctrl, AREnumLimitsStruct * in)
+{
+	HV            *hash = newHV();
+
+	switch (in->listStyle) {
+	case AR_ENUM_STYLE_REGULAR:
+		hv_store(hash, "regularList", strlen("regularList"),
+			 perl_ARList(ctrl, 
+				     (ARList *) & in->u.regularList,
+				     (ARS_fn) perl_ARNameType,
+				     sizeof(ARNameType)
+				     )
+			 ,0
+			 );
+		break;
+	case AR_ENUM_STYLE_CUSTOM:
+		hv_store(hash, "customList", strlen("customList"),
+			 perl_ARList(ctrl,
+				     (ARList *) & in->u.customList,
+				     (ARS_fn) perl_AREnumItemStruct,
+				     sizeof(AREnumItemStruct)
+				     )
+			 ,0
+			 );
+		break;
+	case AR_ENUM_STYLE_QUERY:
+		hv_store(hash, "queryList", strlen("queryList"),
+			 perl_AREnumQueryStruct(ctrl, &(in->u.queryList)), 0);
+		break;
+	default:
+		hv_store(hash, "error", 5,
+			 newSVpv("unknown listStyle", 0), 0);
+		hv_store(hash, "listStyle", strlen("listStyle"),
+			 newSViv(in->listStyle), 0);
+		ARError_add(AR_RETURN_ERROR, AP_ERR_ENUM_LISTSTYLE);
+	}
 	return newRV_noinc((SV *) hash);
 }
 #endif
@@ -519,7 +600,17 @@ perl_ARInternalId(ARControlStruct * ctrl, ARInternalId * in)
 SV             *
 perl_ARNameType(ARControlStruct * ctrl, ARNameType * in)
 {
-	return newSVpv(*in, 0);
+  /*
+	STRLEN len = AR_MAX_NAME_SIZE;
+	return newSVpvn(*in, len);
+	not clear if the above always allocates max_name_size or 
+	of that simply caps the amount of mem it will allocate.
+
+	5.004 doesnt have pvn.. here's equiv..
+	SV *value = newSV(StringLength);
+	sv_setpvn(value,pStringParam->String,StringLength);
+  */
+	return newSVpv(*in, 0); 
 }
 
 SV             *
@@ -673,9 +764,7 @@ perl_ARValueStruct(ARControlStruct * ctrl, ARValueStruct * in)
 					    (ARList *) & diaryList,
 					    (ARS_fn) perl_diary,
 					    sizeof(ARDiaryStruct));
-#ifndef WASTE_MEM
 			FreeARDiaryList(&diaryList, FALSE);
-#endif
 			return array;
 		}
 	case AR_DATA_TYPE_ENUM:
@@ -1234,20 +1323,29 @@ perl_expandARCharMenuStruct(ARControlStruct * ctrl,
 	SV             *sub;
 	char           *string;
 
+	DBG( ("enter\n") );
+
 	Zero(&status, 1, ARStatusList);
+	Zero(&menu,   1, ARCharMenuStruct);
 
 	if (in->menuType != AR_CHAR_MENU_LIST) {
+		DBG( ("input menu is not a LIST, calling ARExpandCharMenu\n") );
 		ret = ARExpandCharMenu(ctrl, in, &menu, &status);
-#ifdef PROFILE
-		((ars_ctrl *) ctrl)->queries++;
-#endif
-		if (ARError(ret, status))
-			return NULL;
+		DBG( ("ARECM ret=%d\n", ret) );
+		if (ARError(ret, status)) {
+			FreeARCharMenuStruct(&menu, FALSE);
+			return &PL_sv_undef;
+		}
 		which = &menu;
-	} else
+	} else {
+		DBG( ("input menu is a LIST, just using that\n") );
 		which = in;
+	}
 
 	array = newAV();
+
+	DBG( ("expanded menu has %d items\n", 
+	      which->u.menuList.numItems) );
 
 	for (i = 0; i < which->u.menuList.numItems; i++) {
 		string = which->u.menuList.charMenuList[i].menuLabel;
@@ -1260,8 +1358,10 @@ perl_expandARCharMenuStruct(ARControlStruct * ctrl,
 		case AR_MENU_TYPE_MENU:
 			sub = perl_expandARCharMenuStruct(ctrl,
 			     which->u.menuList.charMenuList[i].u.childMenu);
-			if (!sub)
-				return NULL;
+			if (!sub) {
+				FreeARCharMenuStruct(&menu, FALSE);
+				return &PL_sv_undef;
+			}
 			av_push(array, sub);
 			break;
 		case AR_MENU_TYPE_NONE:
@@ -1271,6 +1371,7 @@ perl_expandARCharMenuStruct(ARControlStruct * ctrl,
 		}
 	}
 
+	FreeARCharMenuStruct(&menu, FALSE);
 	return newRV_noinc((SV *) array);
 }
 
@@ -1320,20 +1421,27 @@ perl_ARFieldLimitStruct(ARControlStruct * ctrl, ARFieldLimitStruct * in)
 {
 	HV             *hash = newHV();
 
+	DBG( ("FLS dt=%d\n", in->dataType) );
 	switch (in->dataType) {
+	case AR_DATA_TYPE_KEYWORD:
+	  return &PL_sv_undef;
+
 	case AR_DATA_TYPE_INTEGER:
 		hv_store(hash,  "min", strlen("min") , newSViv(in->u.intLimits.rangeLow), 0);
 		hv_store(hash,  "max", strlen("max") , newSViv(in->u.intLimits.rangeHigh), 0);
 		return newRV_noinc((SV *) hash);
+
 	case AR_DATA_TYPE_REAL:
 		hv_store(hash,  "min", strlen("min") , newSVnv(in->u.realLimits.rangeLow), 0);
 		hv_store(hash,  "max", strlen("max") , newSVnv(in->u.realLimits.rangeHigh), 0);
 		hv_store(hash,  "precision", strlen("precision") ,
 			 newSViv(in->u.realLimits.precision), 0);
 		return newRV_noinc((SV *) hash);
+
 	case AR_DATA_TYPE_CHAR:
 		hv_store(hash,  "maxLength", strlen("maxLength") ,
 			 newSViv(in->u.charLimits.maxLength), 0);
+
 		switch (in->u.charLimits.menuStyle) {
 		case AR_MENU_APPEND:
 			hv_store(hash,  "menuStyle", strlen("menuStyle") , newSVpv("append", 0), 0);
@@ -1342,6 +1450,7 @@ perl_ARFieldLimitStruct(ARControlStruct * ctrl, ARFieldLimitStruct * in)
 			hv_store(hash,  "menuStyle", strlen("menuStyle") , newSVpv("overwrite", 0), 0);
 			break;
 		}
+
 		switch (in->u.charLimits.qbeMatchOperation) {
 		case AR_QBE_MATCH_ANYWHERE:
 			hv_store(hash,  "match", strlen("match") , newSVpv("anywhere", 0), 0);
@@ -1353,10 +1462,17 @@ perl_ARFieldLimitStruct(ARControlStruct * ctrl, ARFieldLimitStruct * in)
 			hv_store(hash,  "match", strlen("match") , newSVpv("equal", 0), 0);
 			break;
 		}
+
 		hv_store(hash,  "charMenu", strlen("charMenu") ,
 			 newSVpv(in->u.charLimits.charMenu, 0), 0);
-		hv_store(hash,  "pattern", strlen("pattern") ,
-			 newSVpv(in->u.charLimits.pattern, 0), 0);
+		if(in->u.charLimits.pattern) {
+			hv_store(hash,  "pattern", strlen("pattern") ,
+				 newSVpv(in->u.charLimits.pattern, 0), 0);
+		} else {
+			hv_store(hash, "pattern", strlen("pattern"),
+				 &PL_sv_undef, 0);
+		}
+
 		switch (in->u.charLimits.fullTextOptions) {
 		case AR_FULLTEXT_OPTIONS_NONE:
 			hv_store(hash,  "fullTextOptions", strlen("fullTextOptions") , newSVpv("none", 0), 0);
@@ -1365,7 +1481,9 @@ perl_ARFieldLimitStruct(ARControlStruct * ctrl, ARFieldLimitStruct * in)
 			hv_store(hash,  "fullTextOptions", strlen("fullTextOptions") , newSVpv("indexed", 0), 0);
 			break;
 		}
+
 		return newRV_noinc((SV *) hash);
+
 	case AR_DATA_TYPE_DIARY:
 		switch (in->u.diaryLimits.fullTextOptions) {
 		case AR_FULLTEXT_OPTIONS_NONE:
@@ -1376,36 +1494,62 @@ perl_ARFieldLimitStruct(ARControlStruct * ctrl, ARFieldLimitStruct * in)
 			break;
 		}
 		return newRV_noinc((SV *) hash);
+
 	case AR_DATA_TYPE_ENUM:
 		/*
-		 * perl_ARList returns an array reference which isn't what
-		 * everything else returns. but i guess we'll leave it this
-		 * way because people are used to it at this point. i'll
-		 * leave the code in here as a reference tho.
+		 * as of 5.x, eunmLimits went from a list of ARNameType
+		 * to an AREnumLimitsStruct (true for 5.0.1 and beyond - 
+		 * 5.0beta still had it as a list of NameTypes)
 		 */
-#ifdef KEEP_LIMIT_HASH_UNIFORM
+
+#if AR_EXPORT_VERSION >= 7L
+		DBG( ("case ENUM api v7+\n") );
 		hv_store(hash,  "enumLimits", strlen("enumLimits") ,
-			 perl_ARList(ctrl, (ARList *) & in->u.enumLimits,
-			      (ARS_fn) perl_ARNameType, sizeof(ARNameType)),
-			 0);
-		return newRV_noinc((SV *) hash);
+			 perl_AREnumLimitsStruct(ctrl,
+						 &(in->u.enumLimits))
+			 ,0
+			 );
 #else
-		return perl_ARList(ctrl, (ARList *) & in->u.enumLimits,
-			      (ARS_fn) perl_ARNameType, sizeof(ARNameType));
-#endif
-	case AR_DATA_TYPE_BITMASK:
-#ifdef KEEP_LIMIT_HASH_UNIFORM
-		hv_store(hash,  "bitmask", strlen("bitmask") ,
-			 perl_ARList(ctrl, (ARList *) & in->u.enumLimits,
-			      (ARS_fn) perl_ARNameType, sizeof(ARNameType)),
+		DBG( ("case ENUM api v-6\n") );
+		hv_store(hash,  "enumLimits", strlen("enumLimits") ,
+			 perl_ARList(ctrl, (ARList *) & (in->u.enumLimits),
+				     (ARS_fn) perl_ARNameType, 
+				     sizeof(ARNameType)),
 			 0);
-		return newRV_noinc((SV *) hash);
-#else
-		return perl_ARList(ctrl, (ARList *) & in->u.maskLimits,
-			      (ARS_fn) perl_ARNameType, sizeof(ARNameType));
 #endif
-	case AR_DATA_TYPE_KEYWORD:
+		return newRV_noinc((SV *) hash);
+
+
 	case AR_DATA_TYPE_TIME:
+	  return &PL_sv_undef;
+
+	case AR_DATA_TYPE_BITMASK:
+
+		DBG( ("case BITMASK\n") );
+#if AR_EXPORT_VERSION >= 7L
+		hv_store(hash,  "maskLimits", strlen("maskLimits") ,
+			 perl_AREnumLimitsStruct(ctrl,
+						 &(in->u.enumLimits))
+			 ,0
+			 );
+#else
+		hv_store(hash,  "maskLimits", strlen("maskLimits") ,
+			 perl_ARList(ctrl, (ARList *) & (in->u.enumLimits),
+				     (ARS_fn) perl_ARNameType, 
+				     sizeof(ARNameType)),
+			 0);
+#endif
+		return newRV_noinc((SV *) hash);
+
+	case AR_DATA_TYPE_BYTES:
+	case AR_DATA_TYPE_DECIMAL:
+	case AR_DATA_TYPE_ATTACH:
+#if AR_EXPORT_VERSION >= 7
+	case AR_DATA_TYPE_CURRENCY:
+	case AR_DATA_TYPE_DATE:
+	case AR_DATA_TYPE_TIME_OF_DAY:
+#endif
+
 	case AR_DATA_TYPE_NULL:
 	default:
 		/* no meaningful limits */
@@ -1718,8 +1862,8 @@ perl_BuildEntryList(ARControlStruct * ctrl, AREntryIdList * entryList, char *ent
 			(void) strncpy(entryList->entryIdList[tn], tok, sizeof(AREntryIdType));
 			*(entryList->entryIdList[tn++] + AR_MAX_ENTRYID_SIZE + 1) = 0;
 
-			FREE(eid_orig);
-			FREE(tok);
+			AP_FREE(eid_orig);
+			AP_FREE(tok);
 			return 0;
 		} else {	/* "normal" entry-id */
 			entryList->numItems = 1;
@@ -1858,7 +2002,9 @@ perl_ARViewSchema(ARControlStruct * ctrl, ARViewSchema * in)
 
 	hv_store(hash,  "tableName", strlen("tableName") , newSVpv(in->tableName, 0), 0);
 	hv_store(hash,  "keyField", strlen("keyField") , newSVpv(in->keyField, 0), 0);
+#if AR_EXPORT_VERSION < 6
 	hv_store(hash,  "viewQual", strlen("viewQual") , newSVpv(in->viewQual, 0), 0);
+#endif
 	return newRV_noinc((SV *) hash);
 }
 
@@ -2706,7 +2852,7 @@ sv_to_ARValue(ARControlStruct * ctrl, SV * in, unsigned int dataType,
 			break;
 #if AR_EXPORT_VERSION >= 4
 		case AR_DATA_TYPE_DECIMAL:
-		        out->u.decimalVal = strdup(SvPV(in, PL_na));
+		        out->u.decimalVal = strdup(SvPV(in, PL_na)); 
 			break;
 		case AR_DATA_TYPE_ATTACH:
 			/* value must be a hash reference */
@@ -2731,13 +2877,13 @@ sv_to_ARValue(ARControlStruct * ctrl, SV * in, unsigned int dataType,
 
 					fetch = hv_fetch(hash,  "size", strlen("size") , FALSE);
 					if (!fetch) {
-						safefree(attachp);
+						AP_FREE(attachp);
 						ARError_add(AR_RETURN_ERROR, AP_ERR_ATTACH,
 						"Must specify 'size' key.");
 						return -1;
 					}
 					if (!(SvOK(*fetch) && SvTYPE(*fetch) != SVt_RV)) {
-						safefree(attachp);
+						AP_FREE(attachp);
 						ARError_add(AR_RETURN_ERROR, AP_ERR_ATTACH,
 							    "'size' key does not map to scalar value.");
 						return -1;
@@ -2769,7 +2915,7 @@ sv_to_ARValue(ARControlStruct * ctrl, SV * in, unsigned int dataType,
 					 */
 
 					if ((!fetch && !fetch2) || (fetch && fetch2)) {
-						safefree(attachp);
+						AP_FREE(attachp);
 						ARError_add(AR_RETURN_ERROR, AP_ERR_ATTACH,
 							    "Must specify one either 'file' or 'buffer' key.");
 						return -1;
@@ -2781,7 +2927,7 @@ sv_to_ARValue(ARControlStruct * ctrl, SV * in, unsigned int dataType,
 						STRLEN          filenamelen;
 
 						if (!(SvOK(*fetch) && SvTYPE(*fetch) != SVt_RV)) {
-							safefree(attachp);
+							AP_FREE(attachp);
 							ARError_add(AR_RETURN_ERROR, AP_ERR_ATTACH,
 								    "'file' key does not map to scalar value.");
 							return -1;
@@ -2810,7 +2956,7 @@ sv_to_ARValue(ARControlStruct * ctrl, SV * in, unsigned int dataType,
 					else {
 					        STRLEN __len; /* dummy variable */
 						if (!(SvOK(*fetch2) && SvTYPE(*fetch2) != SVt_RV)) {
-							safefree(attachp);
+							AP_FREE(attachp);
 							ARError_add(AR_RETURN_ERROR, AP_ERR_ATTACH,
 								    "'buffer' key does not map to scalar value.");
 							return -1;
@@ -2856,10 +3002,8 @@ sv_to_ARValue(ARControlStruct * ctrl, SV * in, unsigned int dataType,
 						out->u.coordListVal->coords[i].y = SvIV(*fetch);
 					} else {
 				fetch_puke:	;
-#ifndef WASTE_MEM
-						FREE(out->u.coordListVal->coords);
-						FREE(out->u.coordListVal);
-#endif
+						AP_FREE(out->u.coordListVal->coords);
+						AP_FREE(out->u.coordListVal);
 						ARError_add(AR_RETURN_ERROR, AP_ERR_COORD_STRUCT);
 						return -1;
 					}

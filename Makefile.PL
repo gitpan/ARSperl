@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl
 #
-# $Header: /cvs/ARSperl/Makefile.PL,v 1.42 2002/11/06 16:20:25 jcmurphy Exp $
+# $Header: /cvs/ARSperl/Makefile.PL,v 1.52 2003/09/04 15:34:42 jcmurphy Exp $
 #
 # ARSperl Makefile
 #
@@ -24,13 +24,14 @@ $debug = 0;
 # STEP 1 -> Set the path to your ARS API directory
 
 $ARSAPI     = "/usr/ar/api";
-#$ARSAPI     = "/u1/project/ARSperl/api/sol2/api4.5.2";
-$ARSAPI     = "/u1/project/ARSperl/api/linux/4.5";
-#$ARSAPI     = "/home/jcmurphy/arsperl/api/4.5";
+$ARSAPI     = "/u1/project/ARSperl/api/sol2/api5.1.1";
+$ARSAPI     = "/u1/project/ARSperl/api/linux/5.1.1";
+$ARSAPI     = "/u1/project/ARSperl/api/linux/4.0";
+#$ARSAPI     = "/home/jcmurphy/arsperl/api/5.1";
 
 # STEP 2 -> Choose your version of ARS FROM THE FOLLOWING LIST
 #
-#                  2.0 2.1 3.0 3.1 3.2 4.0 4.52
+#                  2.0 2.1 3.0 3.1 3.2 4.0 4.52 5.0
 #
 #           notes
 #            - if there is a maintenace number (e.g. 4.5.2)
@@ -43,8 +44,6 @@ $ARSAPI     = "/u1/project/ARSperl/api/linux/4.5";
 #           
 $ARSVERSION = 4.0;
 
-
-
 # unless you run into problems, you shouldn't need to read any further.
 # if you do run into problems, and don't really know what this file
 # does, try subscribing to the mailing list and ask for help there.
@@ -55,14 +54,18 @@ $WINDOWS = ($^O eq 'MSWin32');
 #        Windows NT: no "-lpthread"
 #        NCR UNIX: add "-lc -lnet"
 #                -DARSPDEBUG
-$AUTODEFINES = " -DPROFILE -g ";
+$AUTODEFINES = " -g ";
 $AUTODEFINES = "-D_WIN32" if($WINDOWS);
 
 if($ARSVERSION >= 4.0) {
-  $ARS_LIBS = "-lar -lnsl -lnts";
+  $ARS_LIBS = "-lar -lnsl";
+  $ARS_LIBS .= " -lnts" unless ($ARSVERSION >= 5.0);
   $ARS_LIBS .= " -lpthread" unless $WINDOWS;
   $AUTODEFINES .= " -DARS32 ";	
   $AUTODEFINES .= " -DARS452 " if($ARSVERSION >= 4.52);
+  if ( ($ARSVERSION >= 5.0) && ($^O eq 'linux') ) {
+    $AUTODEFINES .= " -malign-double ";
+  }
 }
 
 elsif($ARSVERSION >= 3.0 && $ARSVERSION < 4.0) {
@@ -90,7 +93,7 @@ $AUTODEFINES .= " -DPERL_PATCHLEVEL_IS=$Config{'PATCHLEVEL'} -DPERL_SUBVERSION_I
 if($Config{'baserev'} == 5 &&
    $Config{'PATCHLEVEL'} == 4 &&
    $Config{'SUBVERSION'} == 3) {
-	print "\n\nWARNING: Perl-5.004_03 contained a bugged 'h2ph' application.\nYou should examine line 100 of perl's 'h2ph' script and be sure that it\n
+	print "\n\nWARNING: Perl-5.004_03 contained a buggy 'h2ph' application.\nYou should examine line 100 of perl's 'h2ph' script and be sure that it\n
 produces correct syntax (it's missing a close-parenthesis)\n";
 	print "\nsleeping for 5 seconds. press control-c to abort.\n\n";
 	sleep 5;
@@ -107,11 +110,41 @@ $INCLUDES   = "-I$ARSAPI/include";
 
 GenerateSupportDotH("support-h.template", $INCLUDES);
 
+print "Generating serverTypeInfoHints.h ..\n";
+
+die "whoops. no file at ".$Config{'perlpath'} unless ( -f $Config{'perlpath'} );
+$cmd = "$Config{'perlpath'} infra/exsi.pl < ${ARSAPI}/include/ar.h > serverTypeInfoHints.h";
+$rv = system($cmd);
+die "something went wrong when i ran \"$cmd\" (rv = $rv, expected 0)" unless ($rv == 0);
 
 print "Converting C header files to perl modules ..\n";
 
 foreach ("ar", "arerrno", "nt", "nterrno") {
-	system("h2ph < ${ARSAPI}/include/${_}.h > ARS${_}-h.pm");
+	my $headerFile = "${ARSAPI}/include/${_}.h";
+
+	# arsystem >= 5.0 doesnt have nt libs/hdrs anymore
+	if( ($ARSVERSION >= 5.0) && /^nt/ ) {
+		open(FD, "> ARS${_}-h.pm") || die "open: $!";
+		print FD "\# as of ARSystem 5.0, the NT (notifier) routines
+# are retired. so this file is just stubbed.
+1;\n";
+		close(FD);
+		next;
+	}
+
+	die "couldn't find $headerFile" if (! -e $headerFile);
+
+	# due to the endless confusion over h2ph, i'm including
+	# a known-good copy in the arsperl distribution. the 
+	# -d should make it create _h2ph_pre in the current 
+	# directory incase you never ran h2ph before (as root)
+
+	$rv = system("$Config{'perlpath'} infra/h2ph -d . < $headerFile > ARS${_}-h.pm");
+
+	unlink ('_h2ph_pre.ph');
+	open (FD, "> _h2ph_pre.ph") || die "open: $!";
+	print FD "1;\n";
+	close(FD);
 
 	if((! -e "ARS${_}-h.pm") || (-z "ARS${_}-h.pm")) {
 		open (FD, "> ARS${_}-h.pm") || die "open: $!";
@@ -134,6 +167,7 @@ WriteMakefile(
 	      'LIBS'	=> ["${ARS_LDPATH} ${ARS_LIBS}"],
 	      'OBJECT'  => q[ARS$(OBJ_EXT) support$(OBJ_EXT) supportrev$(OBJ_EXT)],
 	      'INC'	=> "${INCLUDES}",
+	      #'PM' =>{ '_h2ph_pre.ph' => '$(INST_LIBDIR)/_h2ph_pre.ph' },
 	      @extras,
 
 # DEFINE OPTIONS:
@@ -178,7 +212,7 @@ WriteMakefile(
 # don't fiddle with this
 
               'realclean' => {
-		 'FILES' => 'support.h ARSar-h.pm ARSarerrno-h.pm ARSnt-h.pm ARSnterrno-h.pm t/config.cache' 
+		 'FILES' => 'support.h ARSar-h.pm ARSarerrno-h.pm ARSnt-h.pm ARSnterrno-h.pm t/config.cache serverTypeInfoHints.h *~ .purify *-h.pm _h2ph_pre.ph ' 
 	      } 
 );
 

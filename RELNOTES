@@ -1,11 +1,11 @@
-$Header: /cvs/ARSperl/RELNOTES,v 1.9 2000/07/21 01:38:22 jcmurphy Exp $
+$Header: /cvs/ARSperl/RELNOTES,v 1.13 2003/04/24 18:39:18 jcmurphy Exp $
 
 Release Notes for ARSperl
 
 ---------------------------------------------------------------------------
-    ARSperl - An ARS v2 - v4 / Perl5 Integration Kit
+    ARSperl - An ARS v2 - v5 / Perl5 Integration Kit
 
-    Copyright (C) 1995-2000
+    Copyright (C) 1995-2003
 	Joel Murphy, jmurphy@acsu.buffalo.edu
         Jeff Murphy, jcmurphy@acsu.buffalo.edu
 
@@ -16,20 +16,46 @@ Release Notes for ARSperl
     distribution of ARSperl (or the one that accompanies the source 
     distribution of Perl itself) for a full description.
  
-    Comments to:  arsperl@smurfland.cit.buffalo.edu
+    Comments to:  arsperl@arsperl.org
                   (this is a *mailing list* and you must be
                    a subscriber before posting)
 
-    Comments to: arsperl@lurch.cit.buffalo.edu
-    Home Page: http://arsinfo.cit.buffalo.edu
+    Home Page: http://www.arsperl.org
 
 ---------------------------------------------------------------------------
 
+1.80 Notes
+----------
+
+The 1.80 release includes ARS 5.x integration. When compiling against
+ARS 5.x APIs, the ars_NT* functions (notifier library) will no longer
+work. The notifier system has completely changed in release 5.0 of
+ARsystem.
+
+Regardless of what version of API you compile against, the following 
+functions have had their parameters altered which means that scripts 
+will need to be editted (unless you are using the OO layer).
+
+	Function			What's Changed
+	--------------------------------------------------------------
+	ars_GetListEntry		additional required  parameter
+	ars_GetListEntryWithFields	additional required  parameter
+
+The following functions have altered return values.
+
+	Function			What's Changed
+	--------------------------------------------------------------
+	ars_GetCharMenu			for query menus, the 
+					labelField is no longer
+					a scalar. it's now an
+					array ref.
+
+	
 1.68 Notes
 ----------
 
 The 1.68 release includes ARS 4.5 integration. When compiling against ARS
-4.5 APIs, the following data structions will change which _might_ break
+4.5 APIs, the following data structures will change which _might_ break
 existing scripts. You might need to update those scripts when recompiling
 ARSperl against the 4.5 (or later) libraries.
 
@@ -172,8 +198,6 @@ GetFieldTable and such.
 In addition, doing ars_SetEntry($ctrl, ..., $fieldId, undef) will now
 correctly set a field to $NULL$
 
-jeff
-
 1.0 Beta User Notes
 -------------------
 
@@ -188,11 +212,7 @@ jeff
      room for improvement. 
 
    o There is a mailing list available for people to share their 
-     thoughts concerning ARSperl. To subscribe send email to 
-     "majordomo@lurch.cit.buffalo.edu" with a body of "subscribe arsperl".
-     The subject line is ignored.
-
-joel
+     thoughts concerning ARSperl. 
 
 ---------------------------------------------------------------------------
-arsperl@smurfland.cit.buffalo.edu
+arsperl@arsperl.org

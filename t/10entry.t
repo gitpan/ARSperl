@@ -15,7 +15,7 @@ sub mycatch {
 }
 
 if(ars_APIVersion() >= 4) {
-  print "1..9\n";
+  print "1..10\n";
 } else {
   print "1..7\n";
 }
@@ -37,15 +37,25 @@ print "ok [2 openform]\n";
 
 my $id = $s->create("-values" => { 'Submitter' => &CCACHE::USERNAME,
 				 'Status' => 'Assigned',
-				 'Short Description' => 'A test submission'
+				 'Short Description' => 'A test submission',
+				   'Diary Field' => 'A diary entry'
 			       }
 		   );
 print "ok [3 create]\n";
 
 # test 2: retrieve the entry to see if it really worked
 
-my($v) = $s->get(-entry => $id, -field => [ 'Status' ] );
-if($v ne "Assigned") {
+my($v_status,
+   $v_diary) = $s->get(-entry => $id, -field => [ 'Status', 'Diary Field' ] );
+
+# status should be "Assigned" and the diary should contain
+# the expected text, with user=ourusername
+#use Data::Dumper;
+#print "vd ", Dumper($v_diary), "\n";
+
+if( ($v_status ne "Assigned") || 
+    ($v_diary->[0]->{'value'} ne "A diary entry") ||
+    ($v_diary->[0]->{'user'} ne &CCACHE::USERNAME) ) {
   print "not ok [4 $v]\n";
 } else {
   print "ok [4 get]\n";
@@ -91,7 +101,7 @@ if(ars_APIVersion() >= 4) {
   close(FD);
 
   if($fc ne $ic) {
-    print "not ok [attach (create) cmp]\n";
+    print "not ok [attach (create) cmp] fc ", length($fc), " ic ", length($ic), "\n";
   } else {
     print "ok [attach (set) test ; fclen=", length($fc),
 		" iclen=", length($ic), "]\n";
@@ -113,13 +123,13 @@ if(ars_APIVersion() >= 4) {
 				      'Short Description' => 'attach-create'
 				    }
 		      );
-
   # retrieve it "in core" 
 
   my $ic = $s->getAttachment(-entry => $nid,
 			     -field => 'Attachment Field');
 
-  open(FD, $filename) || die "not ok [open $!]\n";
+
+  open(FD, $filename) || die "not ok [open $!]";
   my $fc;
   while(<FD>) {
     $fc .= $_;
@@ -133,6 +143,28 @@ if(ars_APIVersion() >= 4) {
 		" iclen=", length($ic), "]\n";
   }
 
+
+  # retrieve it as a file
+
+  my $ga_rv = $s->getAttachment(-entry => $nid,
+				-field => 'Attachment Field',
+				-file  => 'attach.txt');
+
+  open(FD, 'attach.txt') || die "not ok [open $!]";
+  my $fc2;
+  while(<FD>) {
+    $fc2 .= $_;
+  }
+  close(FD);
+
+  if ($fc2 ne $ic) {
+    print "not ok [get attach to file]\n";
+  } else {
+    print "ok [get attach to file]\n";
+  }
+
+  # cleanup
+  unlink ('attach.txt');
   $s->delete(-entry => $nid);
 }
 
@@ -141,7 +173,7 @@ if(ars_APIVersion() >= 4) {
 
 $s->delete(-entry => $id);
 	   
-print "ok [8 delete]\n";
+print "ok [delete]\n";
 
 exit 0;
 

@@ -1,9 +1,9 @@
 /*
-$Header: /cvs/ARSperl/supportrev.c,v 1.19 2002/11/06 16:20:25 jcmurphy Exp $
+$Header: /cvs/ARSperl/supportrev.c,v 1.21 2003/07/03 19:01:14 jcmurphy Exp $
 
-    ARSperl - An ARS v2 - v4 / Perl5 Integration Kit
+    ARSperl - An ARS v2 - v5 / Perl5 Integration Kit
 
-    Copyright (C) 1995,1996,1997,1998,1999
+    Copyright (C) 1995-2003
 	Joel Murphy, jmurphy@acsu.buffalo.edu
         Jeff Murphy, jcmurphy@acsu.buffalo.edu
 
@@ -14,12 +14,11 @@ $Header: /cvs/ARSperl/supportrev.c,v 1.19 2002/11/06 16:20:25 jcmurphy Exp $
     of ARSperl (or the one that accompanies the source distribution of Perl
     itself) for a full description.
 
-    Comments to:  arsperl@smurfland.cit.buffalo.edu
+    Comments to:  arsperl@arsperl.org
                   (this is a *mailing list* and you must be
                    a subscriber before posting)
 
-    Comments to: arsperl@lurch.cit.buffalo.edu
-    Home Page: http://arsinfo.cit.buffalo.edu
+    Home Page: http://www.arsperl.org
 
 
 */
@@ -205,7 +204,7 @@ strmakHVal(HV * h, char *k, char **b)
 			if (val && *val) {
 				if (SvPOK(*val)) {
 					char           *pvchar = SvPV(*val, len);
-					*b = safemalloc(SvCUR(*val) + 1);
+					*b = MALLOCNN(SvCUR(*val) + 1);
 					strcpy(*b, pvchar);
 					*(b + len) = 0;
 					return 0;
@@ -477,7 +476,7 @@ rev_ARDisplayList(ARControlStruct * ctrl, HV * h, char *k, ARDisplayList * d)
 					d->numItems = av_len(ar) + 1;
 					if (d->numItems == 0)
 						return 0;	/* nothing to do */
-					d->displayList = safemalloc(sizeof(ARDisplayStruct) * d->numItems);
+					d->displayList = MALLOCNN(sizeof(ARDisplayStruct) * d->numItems);
 
 					/*
 					 * iterate over the array, grabbing
@@ -678,7 +677,7 @@ rev_ARInternalIdList(ARControlStruct * ctrl, HV * h, char *k, ARInternalIdList *
 					il->numItems = av_len(ar) + 1;
 					if (il->numItems == 0)
 						return 0;	/* nothing to do */
-					il->internalIdList = safemalloc(sizeof(ARInternalId) * il->numItems);
+					il->internalIdList = MALLOCNN(sizeof(ARInternalId) * il->numItems);
 
 					/*
 					 * iterate over the array, grabbing
@@ -759,7 +758,7 @@ rev_ARActiveLinkActionList(ARControlStruct * ctrl, HV * h, char *k, ARActiveLink
 					if (al->numItems == 0)
 						return 0;	/* nothing to do */
 
-					al->actionList = safemalloc(sizeof(ARActiveLinkActionStruct) * al->numItems);
+					al->actionList = MALLOCNN(sizeof(ARActiveLinkActionStruct) * al->numItems);
 
 					/*
 					 * iterate over the array, grabbing
@@ -890,7 +889,7 @@ rev_ARFieldAssignList(ARControlStruct * ctrl, HV * h, char *k, ARFieldAssignList
 					m->numItems = av_len(ar) + 1;
 					if (m->numItems == 0)
 						return 0;	/* nothing to do */
-					m->fieldAssignList = safemalloc(sizeof(ARFieldAssignStruct) * m->numItems);
+					m->fieldAssignList = MALLOCNN(sizeof(ARFieldAssignStruct) * m->numItems);
 
 					/*
 					 * iterate over the array, grabbing
@@ -1006,21 +1005,21 @@ rev_ARAssignStruct_helper(ARControlStruct * ctrl, HV * h, ARAssignStruct * m)
 
 	else if (hv_exists(h,  "field", strlen("field") )) {
 		m->assignType = AR_ASSIGN_TYPE_FIELD;
-		m->u.field = safemalloc(sizeof(ARAssignFieldStruct));
+		m->u.field = MALLOCNN(sizeof(ARAssignFieldStruct));
 		rv += rev_ARAssignFieldStruct(ctrl, h, "field", m->u.field);
 	} else if (hv_exists(h,  "arith", strlen("arith") )) {
 		m->assignType = AR_ASSIGN_TYPE_ARITH;
-		m->u.arithOp = safemalloc(sizeof(ARArithOpAssignStruct));
+		m->u.arithOp = MALLOCNN(sizeof(ARArithOpAssignStruct));
 		rv += rev_ARArithOpAssignStruct(ctrl, h, "arith", m->u.arithOp);
 	} else if (hv_exists(h,  "function", strlen("function") )) {
 		m->assignType = AR_ASSIGN_TYPE_FUNCTION;
-		m->u.function = safemalloc(sizeof(ARFunctionAssignStruct));
+		m->u.function = MALLOCNN(sizeof(ARFunctionAssignStruct));
 		rv += rev_ARFunctionAssignStruct(ctrl, h, "function", m->u.function);
 	}
 #if AR_EXPORT_VERSION >= 3
 	else if (hv_exists(h,  "sql", strlen("sql") )) {
 		m->assignType = AR_ASSIGN_TYPE_SQL;
-		m->u.sql = safemalloc(sizeof(ARAssignSQLStruct));
+		m->u.sql = MALLOCNN(sizeof(ARAssignSQLStruct));
 		rv += rev_ARAssignSQLStruct(ctrl, h, "sql", m->u.sql);
 	}
 #endif
@@ -1171,7 +1170,7 @@ rev_ARValueStruct(ARControlStruct * ctrl, HV * h, char *k, char *t, ARValueStruc
 			break;
 #if AR_EXPORT_VERSION >= 3
 		case AR_DATA_TYPE_BYTES:
-			m->u.byteListVal = (ARByteList *) safemalloc(sizeof(ARByteList));
+			m->u.byteListVal = (ARByteList *) MALLOCNN(sizeof(ARByteList));
 			if (rev_ARByteList(ctrl, h, k, m->u.byteListVal) == -1)
 				return -1;
 			break;
@@ -1185,7 +1184,7 @@ rev_ARValueStruct(ARControlStruct * ctrl, HV * h, char *k, char *t, ARValueStruc
 			return -1;	/* FIX: implement */
 			break;
 		case AR_DATA_TYPE_COORDS:
-			m->u.coordListVal = (ARCoordList *) safemalloc(sizeof(ARCoordList));
+			m->u.coordListVal = (ARCoordList *) MALLOCNN(sizeof(ARCoordList));
 			if (rev_ARCoordList(ctrl, h, k, m->u.coordListVal) == -1)
 				return -1;
 			break;
@@ -1281,15 +1280,13 @@ rev_ARValueStructDiary(ARControlStruct * ctrl, HV * h, char *k, char **d)
 
 			if (rv == 0) {
 				int             blen = strlen(user) + strlen(value) + 2 + 12;
-				char           *buf = (char *) safemalloc(blen);
+				char           *buf = (char *) MALLOCNN(blen);
 				sprintf(buf, "%d\003%s\003%s", timestamp, user, value);
 				*d = buf;
-#ifndef WASTE_MEM
 				if (user)
-					safefree(user);
+					AP_FREE(user);
 				if (value)
-					safefree(value);
-#endif
+					AP_FREE(value);
 				return 0;
 			}
 		} else {
@@ -1336,7 +1333,7 @@ rev_ARByteList(ARControlStruct * ctrl, HV * h, char *k, ARByteList * b)
 					if (rev_ARByteListStr2Type(ctrl, typeString, &(b->type)) == -1)
 						return -1;
 					b->numItems = byteLen;
-					b->bytes = safemalloc(byteLen + 1);	/* don't want FreeAR..
+					b->bytes = MALLOCNN(byteLen + 1);	/* don't want FreeAR..
 										 * to whack us */
 					copymem(b->bytes, byteString, byteLen);
 					return 0;
@@ -1407,7 +1404,7 @@ rev_ARCoordList(ARControlStruct * ctrl, HV * h, char *k, ARCoordList * m)
 					m->numItems = av_len(ar) + 1;
 					if (m->numItems == 0)
 						return 0;	/* nothing to do */
-					m->coords = safemalloc(sizeof(ARCoordStruct) * m->numItems);
+					m->coords = MALLOCNN(sizeof(ARCoordStruct) * m->numItems);
 
 					/*
 					 * iterate over the array, grabbing
@@ -1874,7 +1871,7 @@ rev_ARFunctionAssignStruct(ARControlStruct * ctrl,
 					s->numItems = av_len(a);	/* no +1 in this case */
 					if (s->numItems == 0)
 						return 0;	/* nothing to do */
-					s->parameterList = (ARAssignStruct *) safemalloc(sizeof(ARAssignStruct) * s->numItems);
+					s->parameterList = (ARAssignStruct *) MALLOCNN(sizeof(ARAssignStruct) * s->numItems);
 
 					for (i = 1; i <= av_len(a); i++) {
 						SV            **hvr = av_fetch(a, i, 0);
@@ -2159,7 +2156,7 @@ rev_ARFieldCharacteristics(ARControlStruct * ctrl,
 					if (rev_ARPropList(ctrl, a, "props", &(m->props)) == -1)
 						return -1;
 #else				/* 2.x */
-					m->display = (ARDisplayStruct *) safemalloc(sizeof(ARDisplayStruct));
+					m->display = (ARDisplayStruct *) MALLOCNN(sizeof(ARDisplayStruct));
 					if (rev_ARDisplayStruct_helper(ctrl, a, "display", m->display) == -1)
 						return -1;
 #endif
@@ -2215,7 +2212,7 @@ rev_ARPropList(ARControlStruct * ctrl, HV * h, char *k, ARPropList * m)
 					if (m->numItems == 0)
 						return 0;	/* nothing to do */
 
-					m->props = (ARPropStruct *) safemalloc(sizeof(ARPropStruct) * m->numItems);
+					m->props = (ARPropStruct *) MALLOCNN(sizeof(ARPropStruct) * m->numItems);
 
 					/*
 					 * iterate over the array, grabbing
@@ -2369,7 +2366,7 @@ rev_ARMacroParmList(ARControlStruct * ctrl, HV * h, char *k, ARMacroParmList * m
 					(void) hv_iterinit(a);
 					for (i = 0; hv_iternext(a) != (HE *) NULL; i++);
 					m->numItems = i;
-					m->parms = (ARMacroParmStruct *) safemalloc(sizeof(ARMacroParmStruct)
+					m->parms = (ARMacroParmStruct *) MALLOCNN(sizeof(ARMacroParmStruct)
 							     * m->numItems);
 					(void) hv_iterinit(a);
 					i2 = 0;
@@ -2442,7 +2439,7 @@ strncasecmp(const char *s1, const char *s2, size_t n)
 
 	char           *p1, *p2;
 	char            c1, c2;
-	int             i;
+	int             i = 0;
 	p1 = s1;
 	p2 = s2;
 

@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl
 #
-# $Header: /cvs/ARSperl/example/Get_Diary.pl,v 1.2 1998/03/31 15:44:00 jcmurphy Exp $
+# $Header: /cvs/ARSperl/example/Get_Diary.pl,v 1.4 2003/07/03 19:01:14 jcmurphy Exp $
 #
 # EXAMPLE
 #    Get_Diary.pl
@@ -15,6 +15,12 @@
 # 03/06/96
 # 
 # $Log: Get_Diary.pl,v $
+# Revision 1.4  2003/07/03 19:01:14  jcmurphy
+# 1.81rc1 mem fixes from steve drew at hp.com
+#
+# Revision 1.3  2003/04/02 01:43:35  jcmurphy
+# mem mgmt cleanup
+#
 # Revision 1.2  1998/03/31 15:44:00  jcmurphy
 # nada
 #
@@ -36,6 +42,10 @@ if(!defined($diaryfield)) {
 
 # Log onto the ars server specified
 
+print "schema=$schema
+qualifier=$qualifier
+diaryfield=$diaryfield\n";
+
 ($ctrl = ars_Login($server, $username, $password)) || 
     die "can't login to the server";
 
@@ -46,7 +56,7 @@ if(!defined($diaryfield)) {
 
 # Retrieve all of the entry-id's for the qualification.
 
-%entries = ars_GetListEntry($ctrl, $schema, $qual, 0);
+%entries = ars_GetListEntry($ctrl, $schema, $qual, 0, 0);
 
 # Retrieve the fieldid for the diary field
 
@@ -55,17 +65,20 @@ if(!defined($diaryfield)) {
 
 foreach $entry_id (sort keys %entries) {
 
-    print "Entry-id: $entry_id\n";
+    print ">>>>>  Entry-id: $entry_id <<<<<\n\n";
 
     # Retrieve the (fieldid, value) pairs for this entry
 
-    %e_vals = ars_GetEntry($ctrl, $schema, $entry_id);
+    %e_vals = ars_GetEntry($ctrl, $schema, $entry_id, 
+			  $diaryfield_fid);
 
     # Print out the diary entries for this entry-id
 
     foreach $diary_entry (@{$e_vals{$diaryfield_fid}}) {
-	print "\t$diary_entry->{timestamp}\t$diary_entry->{user}\n";
-	print "\t$diary_entry->{value}\n";
+	print scalar localtime($diary_entry->{timestamp});
+	print " ", $diary_entry->{user}, "\n";
+	print $diary_entry->{value};
+	print "\n\n";
     }
 }
 

@@ -27,6 +27,78 @@
 	    BGCOLOR='lightblue'>
 	    <tr><td colspan='2'>
   <table width='100%' border='0'><tr>
+	      <td width='50%'>Released: <B>08/09/2003</B></td>
+              <td width='50%'>Version: <B>1.81</B></td>
+  </tr></table></td>
+            </tr><tr bgcolor='#eeeeee'><td width='10%'>(JCM)</td><td width='90%'><font color='black'>memory/multithreaded issue with errhash fixed { steve.drew  at hp.com } 
+</font></td></tr>
+<tr bgcolor='#dddddd'><td width='10%'>(JCM)</td><td width='90%'><font color='black'>uninitialized variable issue fixed { steve.drew  at  hp.com } 
+</font></td></tr>
+<tr bgcolor='#eeeeee'><td width='10%'>(JCM)</td><td width='90%'><font color='black'>memory free'ing on win32 issues fixed { steve.drew  at hp.com } 
+</font></td></tr>
+<tr bgcolor='#dddddd'><td width='10%'>(JCM)</td><td width='90%'><font color='black'>minor fix to OO->query (forgot the new firstretrieve param) 
+</table></td></tr></table>
+
+<P>
+
+
+    <TABLE CELLSPACING='0'
+      CELLPADDING='2'
+      WIDTH='100%'
+      BORDER='0' 
+      BGCOLOR='black'>
+      <TR>
+	<TD width='100%'>
+	  <TABLE CELLSPACING='0' CELLPADDING='3' WIDTH='100%' BORDER='0'
+	    BGCOLOR='lightblue'>
+	    <tr><td colspan='2'>
+  <table width='100%' border='0'><tr>
+	      <td width='50%'>Released: <B>04/16/2003</B></td>
+              <td width='50%'>Version: <B>1.8001</B></td>
+  </tr></table></td>
+            </tr><tr bgcolor='#eeeeee'><td width='10%'>(JCM)</td><td width='90%'><font color='black'>memory leak fixed in ars_CreateEntry 
+</font></td></tr>
+<tr bgcolor='#dddddd'><td width='10%'>(JCM)</td><td width='90%'><font color='black'>memory leak fixed in ars_SetEntry 
+</font></td></tr>
+<tr bgcolor='#eeeeee'><td width='10%'>(JCM)</td><td width='90%'><font color='black'>memory leak fixed in ars_MergeEntry 
+</font></td></tr>
+<tr bgcolor='#dddddd'><td width='10%'>(JCM)</td><td width='90%'><font color='black'>memory leak fixed in ars_Export 
+</font></td></tr>
+<tr bgcolor='#eeeeee'><td width='10%'>(JCM)</td><td width='90%'><font color='black'>memory leak fixed in ars_GetListEntry wrt to join forms 
+</font></td></tr>
+<tr bgcolor='#dddddd'><td width='10%'>(JCM)</td><td width='90%'><font color='black'>memory leak fixed in QualifierStructPtr destructor 
+</font></td></tr>
+<tr bgcolor='#eeeeee'><td width='10%'>(JCM)</td><td width='90%'><font color='black'>memory leak fixed in ControlStruct destructor 
+</font></td></tr>
+<tr bgcolor='#dddddd'><td width='10%'>(JCM)</td><td width='90%'><font color='black'>various other memory related cleanups 
+</font></td></tr>
+<tr bgcolor='#eeeeee'><td width='10%'>(JCM)</td><td width='90%'><font color='black'>bad/NULL ref fixed in ExpandCharMenu 
+</font></td></tr>
+<tr bgcolor='#dddddd'><td width='10%'>(JCM)</td><td width='90%'><font color='black'>added new params to ars_Login: lang, authString, tcpport, rpcnumber 
+</font></td></tr>
+<tr bgcolor='#eeeeee'><td width='10%'>(JCM)</td><td width='90%'><font color='black'>added new rv's to ars_GetControlStructFields: lang, authString 
+</font></td></tr>
+<tr bgcolor='#dddddd'><td width='10%'>(JCM)</td><td width='90%'><font color='black'>updated example and test scripts  
+</font></td></tr>
+<tr bgcolor='#eeeeee'><td width='10%'>(JCM)</td><td width='90%'><font color='black'>added Alert functions (replaces NT/Notifier functions) 
+</font></td></tr>
+<tr bgcolor='#dddddd'><td width='10%'>(JCM)</td><td width='90%'><font color='red'>5.x (5.0.1, 5.1, 5.1.1) integration<BR> 
+functions that no longer are available or always return errors indicating they are no longer implemented: <blockquote> ars_NT*()   [notifier functions] </blockquote> functions whose parameters have changed: <blockquote> ars_GetListEntry()<BR> ars_GetListEntryWithFields() </blockquote> functions whose return values have changed: <blockquote> ars_GetCharMenu() </blockquote> </table></td></tr></table>
+
+<P>
+
+
+    <TABLE CELLSPACING='0'
+      CELLPADDING='2'
+      WIDTH='100%'
+      BORDER='0' 
+      BGCOLOR='black'>
+      <TR>
+	<TD width='100%'>
+	  <TABLE CELLSPACING='0' CELLPADDING='3' WIDTH='100%' BORDER='0'
+	    BGCOLOR='lightblue'>
+	    <tr><td colspan='2'>
+  <table width='100%' border='0'><tr>
 	      <td width='50%'>Released: <B>11/13/2002</B></td>
               <td width='50%'>Version: <B>1.74</B></td>
   </tr></table></td>
@@ -432,7 +504,7 @@ of users from a specified group  </font></td></tr>
 </font></td></tr>
 <tr bgcolor='#eeeeee'><td width='10%'>(JCM)</td><td width='90%'><font color='black'>fixed bug in indexList returned by ars_GetSchema() 
 </font></td></tr>
-<tr bgcolor='#dddddd'><td width='10%'>(JCM)</td><td width='90%'><font color='red'>updated all Get<object> functions so that changeDiary 
+<tr bgcolor='#dddddd'><td width='10%'>(JCM)</td><td width='90%'><font color='red'>updated all Get&lt;object&gt; functions so that changeDiary 
 is fully decoded. </font></td></tr>
 <tr bgcolor='#eeeeee'><td width='10%'>(JCM)</td><td width='90%'><font color='red'>changed return value of ars_DeleteEntry() so that 
 ars_DeleteEntry() || die() will work as expected. </font></td></tr>
@@ -1043,4 +1115,4 @@ Removed -lars from makefile (internal C library that wasn't released), not neede
 
 
 <P>
-<PRE>$Header: /cvs/ARSperl/html/changes.html,v 1.16 2002/11/06 16:20:25 jcmurphy Exp $</PRE></body></html>
+<PRE>$Header$</PRE></body></html>
