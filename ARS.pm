@@ -21,6 +21,50 @@
 #    Comments to: arsperl@smurfland.cit.buffalo.edu
 #
 # $Log: ARS.pm,v $
+# Revision 1.25  1997/11/26 20:06:48  jcmurphy
+# 1.53
+#
+# Revision 1.24  1997/11/10 23:50:36  jcmurphy
+# 1.5206
+#
+# Revision 1.23  1997/11/04 18:19:09  jcmurphy
+# version # update
+#
+# Revision 1.22  1997/10/29 21:57:34  jcmurphy
+# version number change
+#
+# Revision 1.21  1997/10/29 21:54:07  jcmurphy
+# 1.5204
+#
+# Revision 1.20  1997/10/20 21:00:05  jcmurphy
+# 1.5203 beta. code cleanup. winnt additions. malloc/free
+# debugging code.
+#
+# Revision 1.19  1997/10/13 12:26:29  jcmurphy
+# 1.5202
+#
+# Revision 1.18  1997/10/09 15:21:33  jcmurphy
+# 1.5201 version
+#
+# Revision 1.17  1997/10/09 00:57:56  jcmurphy
+# version update. added ARS::DEBUGGING
+#
+# Revision 1.16  1997/10/09 00:49:46  jcmurphy
+# 1.52: uninit'd var bug fix
+#
+# Revision 1.15  1997/10/07 14:29:01  jcmurphy
+# *** empty log message ***
+#
+# Revision 1.14  1997/09/04 00:21:10  jcmurphy
+# *** empty log message ***
+#
+# Revision 1.13  1997/08/05 21:20:04  jcmurphy
+# 1.50 dev1
+#
+# Revision 1.12  1997/07/02 15:51:45  jcmurphy
+# changed ars_errstr, added arserr_hash to exports, remove tie to main
+# on ars_errstr
+#
 # Revision 1.11  1997/02/18 16:38:20  jmurphy
 # added a END block to call ARTermination
 #
@@ -49,12 +93,39 @@
 #
 #
 
+# Routines for grabbing the current error message "stack" 
+# by simply referring to the $ars_errstr scalar.
+
 package ARS::ERRORSTR;
 sub TIESCALAR {
     bless {};
 }
 sub FETCH {
-    ARS::_ars_errstr();
+    my($s, $i) = (undef, undef);
+    my(%mTypes) = ( 0 => "OK", 1 => "WARNING", 2 => "ERROR", 3 => "FATAL",
+		    4 => "INTERNAL ERROR",
+		   -1 => "TRACEBACK");
+    for($i = 0; $i < $ARS::ars_errhash{numItems}; $i++) {
+
+	# If debugging is not enabled, don't show traceback messages
+
+	if($ARS::DEBUGGING == 1) {
+	    $s .= sprintf("[%s] %s (ARERR \#%d)",
+			  $mTypes{@{$ARS::ars_errhash{messageType}}[$i]},
+			  @{$ARS::ars_errhash{messageText}}[$i],
+			  @{$ARS::ars_errhash{messageNum}}[$i]);
+	    $s .= "\n" if($i < $ARS::ars_errhash{numItems}-1);
+	} else {
+	    if(@{$ARS::ars_errhash{messageType}}[$i] != -1) {
+		$s .= sprintf("[%s] %s (ARERR \#%d)",
+			      $mTypes{@{$ARS::ars_errhash{messageType}}[$i]},
+			      @{$ARS::ars_errhash{messageText}}[$i],
+			      @{$ARS::ars_errhash{messageNum}}[$i]);
+		$s .= "\n" if($i < $ARS::ars_errhash{numItems}-1);
+	    }
+	}
+    }
+    return $s;
 }
 
 package ARS;
@@ -65,12 +136,36 @@ require AutoLoader;
 require Config;
 
 @ISA = qw(Exporter DynaLoader);
-@EXPORT = qw(isa_int isa_float isa_string ars_LoadQualifier ars_Login ars_Logoff ars_GetListField ars_GetFieldByName ars_GetFieldTable ars_CreateEntry ars_DeleteEntry ars_GetEntry ars_GetListEntry ars_GetListSchema ars_GetListServer ars_GetActiveLink ars_GetCharMenuItems ars_GetSchema ars_GetField ars_simpleMenu ars_GetListActiveLink ars_SetEntry ars_perl_qualifier ars_Export ars_GetListFilter ars_GetListEscalation ars_GetListCharMenu ars_GetListAdminExtension ars_padEntryid ars_GetFilter ars_GetProfileInfo ars_Import ars_GetCharMenu ars_GetServerStatistics ars_NTDeregisterServer ars_NTGetListServer ars_NTInitializationServer ars_NTNotificationServer ars_NTTerminationServer ars_NTDeregisterClient ars_NTInitializationClient ars_NTRegisterClient ars_NTTerminationClient ars_NTRegisterServer ars_GetCurrentServer %ARServerStats ars_EncodeDiary ars_MergeEntry);
+@EXPORT = qw(isa_int isa_float isa_string ars_LoadQualifier ars_Login 
+ars_Logoff ars_GetListField ars_GetFieldByName ars_GetFieldTable 
+ars_DeleteEntry ars_GetEntry ars_GetListEntry ars_GetListSchema 
+ars_GetListServer ars_GetActiveLink ars_GetCharMenuItems ars_GetSchema 
+ars_GetField ars_simpleMenu ars_GetListActiveLink ars_SetEntry 
+ars_perl_qualifier ars_Export ars_GetListFilter ars_GetListEscalation 
+ars_GetListCharMenu ars_GetListAdminExtension ars_padEntryid ars_GetFilter 
+ars_GetProfileInfo ars_Import ars_GetCharMenu ars_GetServerStatistics 
+ars_NTDeregisterServer ars_NTGetListServer ars_NTInitializationServer 
+ars_NTNotificationServer ars_NTTerminationServer ars_NTDeregisterClient 
+ars_NTInitializationClient ars_NTRegisterClient ars_NTTerminationClient 
+ars_NTRegisterServer ars_GetCurrentServer ars_EncodeDiary 
+ars_CreateEntry ars_MergeEntry ars_DeleteFilter
+ars_DeleteMultipleFields ars_DeleteActiveLink
+ars_DeleteAdminExtension ars_DeleteCharMenu
+ars_DeleteEscalation ars_DeleteField ars_DeleteSchema
+ars_DeleteVUI ars_ExecuteAdminExtension ars_ExecuteProcess
+ars_GetAdminExtension ars_GetEscalation ars_GetFullTextInfo
+ars_GetListGroup ars_GetListSQL ars_GetListUser
+ars_GetListVUI ars_GetServerInfo
+ars_CreateActiveLink ars_CreateAdminExtension
+ars_GetControlStructFields ars_GetVUI
+$ars_errstr %ARServerStats %ars_errhash
+);
 
-$VERSION = '1.46';
+$VERSION   = '1.53';
+$DEBUGGING = 0;
 
-bootstrap ARS;
-tie $main::ars_errstr, ARS::ERRORSTR;
+bootstrap ARS $VERSION;
+tie $ars_errstr, ARS::ERRORSTR;
 
 $AR_EXECUTE_ON_NONE =          0;
 $AR_EXECUTE_ON_BUTTON =        1;
@@ -155,10 +250,40 @@ $AR_EXECUTE_ON_QUERY =      1024;
  'SINCE_START'    ,56
 );
 
+# ROUTINE
+#   AR_DAY(mask, dayNumber)
+#   AR_HOUR(mask, hourNumber)
+#
+# DESCRIPTION
+#   Used to analyze bitmask returned by ars_GetEscalation()
+#
+# RETURNS
+#   1 if that day or hour is set in the mask
+#   0 if that day or hour is not set in the mask
+
+sub AR_DAY {
+    my($x, $y) = (shift, shift);
+    return (($x >> $y) & 0x1);
+}
+
+sub AR_HOUR {
+    my($x, $y) = (shift, shift);
+    return (($x >> $y) & 0x1);
+}
+
 $field_entryId = 1;
 
+# ROUTINE
+#   ars_simpleMenu(menuItems, prepend)
+#
+# DESCRIPTION
+#   merges all sub-menus into a single level menu. good for web 
+#   interfaces.
+#
+# RETURNS
+#   array of menu items.
+
 sub ars_simpleMenu {
-    # merges all sub-menus into a single level menu
     my($m) = shift;
     my($prepend) = shift;
     my(@m) = @$m;
@@ -180,6 +305,19 @@ sub ars_simpleMenu {
     @ret;
 }
 
+# ROUTINE
+#   ars_padEntryid(control, schema, entry-id)
+#
+# DESCRIPTION
+#   this routine will left-pad the entry-id with
+#   zeros out to the appropriate number of place (15 max)
+#   depending upon if your prefix your entry-id's with
+#   anything
+#
+# RETURNS
+#   a new scalar on success
+#   undef on error
+
 sub ars_padEntryid {
     my($c) = shift;
     my($schema) = shift;
@@ -191,11 +329,59 @@ sub ars_padEntryid {
     return ("0"x($field->{limit}{maxLength}-length($entry_id))).$entry_id;
 }
 
+# ROUTINE
+#   ars_decodeStatusHistory(field-value)
+#
+# DESCRIPTION
+#   this routine, when given an encoded status history field
+#   (returned by GetEntry) will decode it into a hash like:
+#
+#   $retval[ENUM]->{USER}
+#   $retval[ENUM]->{TIME}
+#
+#   so if you have a status field that has two states: Open and Closed,
+#   where Open is enum 0 and Closed is enum 1, this routine will return:
+#
+#   $retval[0]->{USER} = the user to last selected this enum
+#   $retval[1]->{TIME} = the time that this enum was last selected
+#
+#   You can map from enum values to selection words by using 
+#   arsGetField().
+
+sub ars_decodeStatusHistory {
+    my ($sval) = shift;
+    my ($enum) = 0;
+    my ($pair, $ts, $un);
+
+    foreach $pair (split(/\003/, $sval)) {
+	print $enum++.": ";
+	if($pair ne "") {
+	    ($ts, $un) = split(/\004/, $pair);
+	    print localtime($ts)." - $un\n";
+	} else {
+	    print "no value for this enumeration\n";
+	}
+    }
+}
+
 #define AR_DEFN_DIARY_SEP        '\03'     /* diary items separator */
 #define AR_DEFN_DIARY_COMMA      '\04'     /* char between date/user/text */
 
+# ROUTINE
+#   ars_EncodeDiary(timestamp, username, value, timestamp, username, value, ...)
+#
+# DESCRIPTION
+#   given a list of timestamp, username and value triplets, 
+#   encode them into an ars-internal diary string. this can 
+#   then be fed into ars_MergeEntry() in order to alter the contents
+#   of an existing diary entry.
+#
+# RETURNS
+#   an encoded diary string (scalar) on success
+#   undef on failure
+
 sub ars_EncodeDiary {
-    my ($diary_string);
+    my ($diary_string) = undef;
     foreach $entry (@_) {
 	$diary_string .= pack("c",4) if ($diary_string);
 	$diary_string .= $entry->{timestamp}.pack("c",3).$entry->{user}.pack("c",3).$entry->{value}
@@ -203,10 +389,11 @@ sub ars_EncodeDiary {
     return $diary_string;
 }
 
+
 # call ARInitialization
 ARS::__ars_init();
 
-# call ARTermination
+# call ARTermination when the package is terminated
 END {
   ARS::__ars_Termination();
 }

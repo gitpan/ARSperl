@@ -1,0 +1,32 @@
+
+ARSperl todo list:
+
+  o implement remaining functions:
+
+ARCreateCharMenu
+ARCreateEscalation
+ARCreateField
+ARCreateFilter
+ARCreateSchema
+ARCreateVUI
+ARGetEntryStatistics
+ARSetActiveLink
+ARSetAdminExtension
+ARSetCharMenu
+ARSetEscalation
+ARSetField
+ARSetFilter
+ARSetFullTextInfo
+ARSetSchema
+ARSetServerInfo
+ARSetVUI
+
+   o clean up verbose warning output (mostly 
+     unused variables due to the 2.x/3.0 intermixed
+     code)
+
+   o update doc for GetField
+
+
+   o examine perl_ARFieldLimitStruct(). sometimes it returns
+	a HASH ref, sometimes an ARRAY ref

@@ -1,6 +1,6 @@
 #!/utiloss/bin/perl5.002
 #
-# $Header: /u1/project/ARSperl/ARSperl/WWW/RCS/ars_web_serv,v 1.1 1996/11/21 19:58:24 jcmurphy Exp $
+# $Header: /u1/project/ARSperl/ARSperl/WWW/RCS/ars_web_serv,v 1.2 1997/09/29 17:59:37 jcmurphy Exp $
 #
 #    ars_web_serv - A Web Client for ARS2.0
 #
@@ -24,6 +24,9 @@
 #    Comments to: arsperl@smurfland.cit.buffalo.edu
 #
 # $Log: ars_web_serv,v $
+# Revision 1.2  1997/09/29 17:59:37  jcmurphy
+# added param to GetListEntry call (line 881)
+#
 # Revision 1.1  1996/11/21 19:58:24  jcmurphy
 # Initial revision
 #
@@ -878,7 +881,7 @@ sub eval_queryValue {
     
 #    $sess = ars_Login($r->{server}, $input{USERNAME}, $input{PASSWORD});
 # FIX -- ignores server name     
-    @l = ars_GetListEntry($c, $r->{schema}, $r->{qualifier});
+    @l = ars_GetListEntry($c, $r->{schema}, $r->{qualifier}, 0);
     if ($#l < 0) {
 	$message .= "Warning: less than one match for query\n<BR>";
 	return undef;
