@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl
 #
-# $Header: /u1/project/ARSperl/ARSperl/example/RCS/GetField.pl,v 1.1 1997/02/19 22:41:16 jcmurphy Exp $
+# $Header: /u1/project/ARSperl/ARSperl/example/RCS/GetField.pl,v 1.2 1997/05/07 15:38:19 jcmurphy Exp jcmurphy $
 #
 # EXAMPLE
 #    GetField.pl [server] [username] [password] [schema] [fieldname]
@@ -18,6 +18,9 @@
 # 02/19/97
 #
 # $Log: GetField.pl,v $
+# Revision 1.2  1997/05/07 15:38:19  jcmurphy
+# fixed incorrect hash usage
+#
 # Revision 1.1  1997/02/19 22:41:16  jcmurphy
 # Initial revision
 #
@@ -25,6 +28,14 @@
 #
 
 use ARS;
+
+%subHashes = ("displayInstanceList" => 1,
+	      "permissions" => 1,
+	      "limit" => 1,
+	      "fieldMap" => 1);
+
+%subArrays = ("dInstanceList" => 1,
+	      "commonProps" => 1);
 
 # Parse command line parameters
 
@@ -60,16 +71,45 @@ Default Admin View of schema \"$schema\"\n";
 
 print "Fetching field information ..\n";
 
-(%fieldInfo = ars_GetField($ctrl, $schema, $fids{$fieldname})) ||
+($fieldInfo = ars_GetField($ctrl, $schema, $fids{$fieldname})) ||
     die "GetField: $ars_errstr";
 
 print "Here are some of the field attributes. More are available.
 
-fieldId: $fieldInfo{fieldId}
-createMode: $fieldInfo{createMode}
-dataType: $fieldInfo{dataType}
-defaultVal: $fieldInfo{defaultVal}
-owner: $fieldInfo{owner}
+fieldId: $fieldInfo->{fieldId}
+createMode: $fieldInfo->{createMode}
+dataType: $fieldInfo->{dataType}
+defaultVal: $fieldInfo->{defaultVal}
+owner: $fieldInfo->{owner}
+
 ";
 
+dumpKV($fieldInfo, 0);
+
 ars_Logoff($ctrl);
+
+
+exit 0;
+
+sub dumpKV {
+  my $hr = shift;
+  my $i = shift;
+
+  foreach $k (keys %$hr){
+      print "\t"x$i."key=<$k> val=<$hr->{$k}>\n";
+      if($subHashes{$k} == 1) {
+	dumpKV($hr->{$k}, $i+1);
+      }
+      elsif($subArrays{$k} == 1) {
+        dumpAV($hr->{k}, $i+1);
+      }
+  }
+}
+
+sub dumpAV {
+   my $ar = shift;
+   my $i = shift;
+
+   print "\t"x$i."(".join(',', @$ar).")\n";
+}
+
