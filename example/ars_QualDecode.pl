@@ -1,5 +1,5 @@
 #
-# $Header: /u1/project/ARSperl/ARSperl/example/RCS/ars_QualDecode.pl,v 1.6 1998/04/20 17:13:25 jcmurphy Exp $
+# $Header: /cvs/ARSperl/example/ars_QualDecode.pl,v 1.6 1998/04/20 17:13:25 jcmurphy Exp $
 #
 # MODULE
 #   ars_QualDecode.pl

@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl
 #
-# $Header: /u1/project/ARSperl/ARSperl/example/RCS/GetServerStatistics.pl,v 1.1 1996/11/21 20:13:53 jcmurphy Exp $
+# $Header: /cvs/ARSperl/example/GetServerStatistics.pl,v 1.1 1996/11/21 20:13:53 jcmurphy Exp $
 #
 # NAME
 #   GetServerStatistics.pl

@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl
 #
-# $Header: /u1/project/ARSperl/ARSperl/example/RCS/PrintQual.pl,v 1.1 1997/02/20 19:33:02 jcmurphy Exp jcmurphy $
+# $Header: /cvs/ARSperl/example/PrintQual.pl,v 1.2 1999/10/03 04:09:08 jcmurphy Exp $
 #
 # EXAMPLE
 #    PrintQual.pl
@@ -31,6 +31,9 @@
 # 02/20/97
 #
 # $Log: PrintQual.pl,v $
+# Revision 1.2  1999/10/03 04:09:08  jcmurphy
+# various
+#
 # Revision 1.1  1997/02/20 19:33:02  jcmurphy
 # Initial revision
 #

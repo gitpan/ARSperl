@@ -1,5 +1,5 @@
 /*
-$Header: /u1/project/ARSperl/ARSperl/RCS/supportrev.h,v 1.8 1998/12/28 15:46:10 jcmurphy Exp $
+$Header: /cvs/ARSperl/supportrev.h,v 1.8 1998/12/28 15:46:10 jcmurphy Exp $
 
     ARSperl - An ARS v2 - v4 / Perl5 Integration Kit
 

@@ -1,5 +1,5 @@
 /*
-$Header: /u1/project/ARSperl/ARSperl/RCS/ARS.xs,v 1.57 1999/01/04 21:05:14 jcmurphy Exp $
+$Header: /cvs/ARSperl/ARS.xs,v 1.59 1999/10/03 04:00:27 jcmurphy Exp $
 
     ARSperl - An ARS v2 - v4 / Perl5 Integration Kit
 
@@ -21,6 +21,12 @@ $Header: /u1/project/ARSperl/ARSperl/RCS/ARS.xs,v 1.57 1999/01/04 21:05:14 jcmur
     LOG:
 
 $Log: ARS.xs,v $
+Revision 1.59  1999/10/03 04:00:27  jcmurphy
+various
+
+Revision 1.58  1999/03/12 07:27:16  jcmurphy
+1.6400 BETA - OO layer and attachments
+
 Revision 1.57  1999/01/04 21:05:14  jcmurphy
 fixed some conditional compilation typos/omissions
 
@@ -605,7 +611,7 @@ ars_GetFieldTable(control,schema)
 	  }
 	}
 
-char *
+SV *
 ars_CreateEntry(ctrl,schema,...)
 	ARControlStruct *	ctrl
 	char *			schema
@@ -615,10 +621,9 @@ ars_CreateEntry(ctrl,schema,...)
 	  AREntryIdType     entryId;
 	  ARFieldValueList  fieldList;
 	  ARStatusList      status;
-	  int               ret;
+	  int               ret, rv = 0;
 	  unsigned int      dataType;
 	  
-	  RETVAL = "";
 	  (void) ARError_reset();
 	  Zero(&status, 1, ARStatusList);
 	  if (((items - 2) % 2) || c < 1) {
@@ -650,9 +655,13 @@ ars_CreateEntry(ctrl,schema,...)
 #ifdef PROFILE
 	    ((ars_ctrl *)ctrl)->queries++;
 #endif
-	    if (! ARError( ret, status)) 
-	      RETVAL = entryId;
+	    if (! ARError( ret, status)) rv = 1;
+
 	  create_entry_end:;
+	    if(rv == 0)
+		RETVAL = newSVsv(&sv_undef);
+	    else
+		RETVAL = newSVpv(VNAME(entryId));
 #ifndef WASTE_MEM
 	  safefree(fieldList.fieldValueList);
 #endif
@@ -704,6 +713,73 @@ ars_DeleteEntry(ctrl,schema,entry_id)
 	}
 	OUTPUT:
 	RETVAL
+
+void
+ars_GetEntryBLOB(ctrl,schema,entry_id,field_id,locType,locFile=NULL)
+	ARControlStruct *	ctrl
+	char *			schema
+	char *			entry_id
+	ARInternalId		field_id
+	int 			locType
+	char *			locFile
+	PPCODE:
+	{
+		ARStatusList    status;
+		AREntryIdList   entryList;
+#if AR_EXPORT_VERSION >= 4
+		ARLocStruct     loc;
+		ARBufStruct     buf;
+#endif
+		int		ret;
+
+		(void) ARError_reset();
+		Zero(&status, 1, ARStatusList);
+#if AR_EXPORT_VERSION >= 4
+		/* build entryList */
+	 	ret = perl_BuildEntryList(ctrl, &entryList, entry_id);
+		if(ret)
+			goto get_entryblob_end;
+		switch(locType) {
+		case AR_LOC_FILENAME:
+			if(locFile == NULL) {
+				ARError_add(AR_RETURN_ERROR,
+					AP_ERR_USAGE,
+					"locFile parameter required when specifying AR_LOC_FILENAME");
+				goto get_entryblob_end;
+			}
+			loc.locType    = AR_LOC_FILENAME;
+			loc.u.filename = locFile;
+			break;
+		case AR_LOC_BUFFER:
+			loc.locType       = AR_LOC_BUFFER;
+			loc.u.buf.bufSize = 0;
+			break;
+		default:
+			ARError_add(AR_RETURN_ERROR,
+				AP_ERR_USAGE,
+				"locType parameter is required.");
+			goto get_entryblob_end;
+			break;
+		}
+		ret = ARGetEntryBLOB(ctrl, schema, &entryList, field_id, 
+				     &loc, &status);
+		if(!ARError(ret, status)) {
+			if(locType == AR_LOC_BUFFER)
+				XPUSHs(newSVpv(loc.u.buf.buffer, 
+					loc.u.buf.bufSize));
+			else
+				XPUSHs(newSViv(1));
+		} else
+			XPUSHs(&sv_undef);
+		FreeAREntryIdList(&entryList, FALSE);
+		FreeARLocStruct(&loc, FALSE);
+#else /* pre ARS-4.0 */
+		(void) ARError_add(AR_RETURN_ERROR, AP_ERR_DEPRECATED, 
+			"NTTerminationClient() is only available > ARS4.x");
+		XPUSHs(&sv_undef);
+#endif
+	get_entryblob_end:;
+	}
 
 void
 ars_GetEntry(ctrl,schema,entry_id,...)
@@ -950,18 +1026,25 @@ ars_GetListSchema(ctrl,changedsince=0,schemaType=AR_LIST_SCHEMA_ALL,name=NULL)
 	}
 
 void
-ars_GetListServer(ctrl=NULL)
-	ARControlStruct * 	ctrl
+ars_GetListServer()
 	PPCODE:
 	{
 	  ARServerNameList serverList;
 	  ARStatusList     status;
 	  int              i, ret;
+	  ARControlStruct  ctrl;
 
 	  (void) ARError_reset();  
 	  Zero(&status, 1, ARStatusList);
+	  Zero(&ctrl, 1, ARControlStruct);
 #if AR_EXPORT_VERSION >= 4
-	  ret = ARGetListServer(ctrl, &serverList, &status);
+	  /* this function can be called without a control struct 
+	   * (or even before a control struct is available).
+	   * we will create a bogus control struct, initialize it
+	   * and execute the function. this seems to work fine.
+	   */
+	  ARInitialization(&ctrl, &status);
+	  ret = ARGetListServer(&ctrl, &serverList, &status);
 #else
 	  ret = ARGetListServer(&serverList, &status);
 #endif
@@ -1998,7 +2081,7 @@ ars_GetListAdminExtension(control,changedsince=0)
 	unsigned long		changedsince
 	PPCODE:
 	{
-#ifndef ARS32
+#if !defined(ARS32) && (AR_EXPORT_VERSION < 4)
 	  ARNameList   nameList;
 	  ARStatusList status;
 	  int          ret, i;
@@ -2016,9 +2099,9 @@ ars_GetListAdminExtension(control,changedsince=0)
 	    FreeARNameList(&nameList,FALSE);
 #endif
 	  }
-#else /* ARS32 */
+#else /* ARS32 or later */
 	(void) ARError_add( AR_RETURN_ERROR, AP_ERR_DEPRECATED, "ars_GetListAdminExtension() is not available in ARS3.2 or later.");
-#endif /* ARS32 */
+#endif /* ARS32 or later */
 	}
 
 int
@@ -2086,7 +2169,7 @@ ars_DeleteAdminExtension(ctrl, name)
 	char *			name
 	CODE:
 	{
-#ifndef ARS32
+#if !defined(ARS32) && (AR_EXPORT_VERSION < 4)
 	  ARStatusList status;
 	  int          ret;
 
@@ -2104,7 +2187,7 @@ ars_DeleteAdminExtension(ctrl, name)
 	  } else {
 		(void) ARError_add( AR_RETURN_ERROR, AP_ERR_BAD_ARGS);
 	  }
-#else /* ARS32 */
+#else /* ARS32 or later */
 	RETVAL = 0;
 	(void) ARError_add( AR_RETURN_ERROR, AP_ERR_DEPRECATED, "ars_DeleteAdminExtension() is not available in ARS3.2 or later.");
 #endif /* ARS32 */
@@ -2295,7 +2378,7 @@ ars_ExecuteAdminExtension(ctrl, name)
 	char *			name
 	CODE:
 	{
-#ifndef ARS32
+#if !defined(ARS32) && (AR_EXPORT_VERSION < 4)
 	 ARStatusList status;
 	 int          ret;
 
@@ -2309,7 +2392,7 @@ ars_ExecuteAdminExtension(ctrl, name)
 #endif
 	 if(!ARError( ret, status))
 		RETVAL = 1;
-#else /* ARS32 */
+#else /* ARS32 or later */
 	RETVAL = 0;
 	(void) ARError_add( AR_RETURN_ERROR, AP_ERR_DEPRECATED, "ars_ExecuteAdminExtension() is not available in ARS3.2 or later.");
 #endif /* ARS32 */
@@ -2369,7 +2452,7 @@ ars_GetAdminExtension(ctrl, name)
 	char *			name
 	CODE:
 	{
-#ifndef ARS32
+#if !defined(ARS32) && (AR_EXPORT_VERSION < 4)
 	 ARStatusList  status;
 	 ARInternalIdList groupList;
 	 char          command[AR_MAX_COMMAND_SIZE];
@@ -2425,7 +2508,7 @@ ars_GetAdminExtension(ctrl, name)
 		}
 #endif
 	 }
-#else /* ARS32 */
+#else /* ARS32 or later */
 	 RETVAL = 0;
 	 (void) ARError_add( AR_RETURN_ERROR, AP_ERR_DEPRECATED, "ars_GetAdminExtension() is not available in ARS3.2 or later.");
 #endif /* ARS32 */
@@ -2670,7 +2753,7 @@ ars_GetListSQL(ctrl, sqlCommand, maxRetrieve=AR_NO_MAX_LIST_RETRIEVE)
 	  int             ret;
 
 	  (void) ARError_reset();
-	  RETVAL = newHV();
+	  RETVAL = NULL;
 	  Zero(&status, 1, ARStatusList);
 #ifndef ARS20
 	  ret = ARGetListSQL(ctrl, sqlCommand, maxRetrieve, &valueListList, 
@@ -2681,11 +2764,14 @@ ars_GetListSQL(ctrl, sqlCommand, maxRetrieve=AR_NO_MAX_LIST_RETRIEVE)
 	  if(!ARError( ret, status)) {
 	     int  row, col;
 	     AV  *ra = newAV(), *ca;
+	     RETVAL = newHV();
 
 	     hv_store(RETVAL, VNAME("numMatches"), newSViv(numMatches), 0);
 	     for(row = 0; row < valueListList.numItems ; row++) {
 		ca = newAV();
-		for(col = 0; col < valueListList.valueListList[row].numItems; col++) {
+		for(col = 0; col < valueListList.valueListList[row].numItems;
+		    col++) 
+		{
 		   av_push(ca, perl_ARValueStruct(ctrl,
 			&(valueListList.valueListList[row].valueList[col])));
 		}
@@ -3011,7 +3097,7 @@ ars_CreateAdminExtension(ctrl, aeDefRef)
 			"name, groupList, command");
 		}
 	  }
-#else /* ARS32 */
+#else /* ARS32 or later */
 	  RETVAL = 0;
 	  (void) ARError_add( AR_RETURN_ERROR, AP_ERR_DEPRECATED, "ars_CreateAdminExtension() is not available in ARS3.2 or later.");
 #endif /* ARS32 */
@@ -3339,12 +3425,13 @@ ars_NTRegisterServer(serverHost, user, password, ...)
 	  (void) ARError_reset();
 	  RETVAL = 0;
 	  if(serverHost && user && password && items == 3) {
-	    ret = NTRegisterServer(serverHost, user, password, &status);
-	    if(!NTError(ret, status)) {
-		RETVAL = 1;
-	    }
+		ret = NTRegisterServer(serverHost, user, password, &status);
+		if(!NTError(ret, status)) {
+			RETVAL = 1;
+		}
 	  } else {
-	    (void) ARError_add(AR_RETURN_ERROR, AP_ERR_USAGE, "usage: ars_NTRegisterServer(serverHost, user, password)");
+		(void) ARError_add(AR_RETURN_ERROR, AP_ERR_USAGE,
+			"usage: ars_NTRegisterServer(serverHost, user, password)");
 	  }
 #else
 	  NTPortAddr    clientPort;
@@ -3355,35 +3442,46 @@ ars_NTRegisterServer(serverHost, user, password, ...)
 	  (void) ARError_reset();
 	  Zero(&status, 1, NTStatusList);
 	  RETVAL = 0;
+	
           if (items < 4 || items > 7) {
-	    (void) ARError_add(AR_RETURN_ERROR, AP_ERR_BAD_ARGS);
+		(void) ARError_add(AR_RETURN_ERROR, AP_ERR_BAD_ARGS);
+		goto ntregserver_end;
 	  }
+	
 	  clientPort = (unsigned int)SvIV(ST(3));
+	
 	  if (items < 5) {
-	    clientCommunication = 2;
+		clientCommunication = NT_CLIENT_COMMUNICATION_SOCKET;
 	  } else {
-	    clientCommunication = (unsigned int)SvIV(ST(4));
+		clientCommunication = (unsigned int)SvIV(ST(4));
 	  }
+	
 	  if (items < 6) {
-	    protocol = 1;
+		protocol = NT_PROTOCOL_TCP;
 	  } else {
-	    protocol = (unsigned int)SvIV(ST(5));
+		protocol = (unsigned int)SvIV(ST(5));
 	  }
+	
 	  if (items < 7) {
-	    multipleClients = 1;
+		multipleClients = 1;
 	  } else {
-	    multipleClients = (unsigned int)SvIV(ST(6));
+		multipleClients = (unsigned int)SvIV(ST(6));
 	  }
-	  
+
 	  if(clientCommunication == NT_CLIENT_COMMUNICATION_SOCKET) {
-	    if(protocol == NT_PROTOCOL_TCP) {
-		ret = NTRegisterServer(serverHost, user, password, clientCommunication, clientPort, protocol, multipleClients, &status);
-	      if(!NTError(ret, status)) {
-		RETVAL = 1;
-	      }
-	    } else (void) ARError_add(AR_RETURN_ERROR, AP_ERR_BAD_ARGS);
-      } else (void) ARError_add(AR_RETURN_ERROR, AP_ERR_BAD_ARGS);
+		if(protocol == NT_PROTOCOL_TCP) {
+			ret = NTRegisterServer(serverHost, user, password, clientCommunication, clientPort, protocol, multipleClients, &status);
+			if(!NTError(ret, status)) {
+				RETVAL = 1;
+			}
+		} else 
+			(void) ARError_add(AR_RETURN_ERROR, AP_ERR_INV_ARGS,
+				"protocol arg invalid.");
+	  } else 
+		(void) ARError_add(AR_RETURN_ERROR, AP_ERR_INV_ARGS,
+				"clientCommunication arg invalid.");
 #endif
+	ntregserver_end:;
 	}
 	OUTPUT:
 	RETVAL
@@ -3407,7 +3505,7 @@ ars_NTTerminationServer()
 	RETVAL
 
 int
-ars_NTDeregisterServer(serverHost, user, password, port)
+ars_NTDeregisterServer(serverHost, user, password, port=0)
 	char *		serverHost
 	char *		user
 	char *		password

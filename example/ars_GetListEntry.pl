@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl
 #
-# $Header: /u1/project/ARSperl/ARSperl/example/RCS/ars_GetListEntry.pl,v 1.1 1998/03/25 22:52:51 jcmurphy Exp $
+# $Header: /cvs/ARSperl/example/ars_GetListEntry.pl,v 1.1 1998/03/25 22:52:51 jcmurphy Exp $
 #
 # NAME
 #   ars_GetListEntry.pl [server] [username] [password]

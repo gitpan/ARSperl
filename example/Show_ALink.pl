@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl
 #
-# $Header: /u1/project/ARSperl/ARSperl/example/RCS/Show_ALink.pl,v 1.5 1998/09/14 17:41:05 jcmurphy Exp $
+# $Header: /cvs/ARSperl/example/Show_ALink.pl,v 1.5 1998/09/14 17:41:05 jcmurphy Exp $
 #
 # EXAMPLE
 #    Show_ALink.pl

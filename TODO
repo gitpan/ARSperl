@@ -4,6 +4,9 @@ ARStatusStruct :
 
 ARSperl todo list:
 
+  o active link decoding
+	decode DDE
+
   o implement remaining functions:
 
 ARCreateCharMenu
@@ -33,3 +36,15 @@ ARSetVUI
      worked in (partial fix) and outter join handling
      needs to be fixed up. 
 
+   o clean up documentation (replace numbers with symbolic
+     constants).
+
+   o add additional OO support.
+
+   o add sort order option to OO
+   o obey vui name
+   o pad out entry id where applicable.
+   o allow for field id's to be specified if user chooses.
+   o status history conversion?
+   o allow for either/or enumer text or enum value in set/create
+   o if unknown param, error

@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl
 #
-# $Header: /u1/project/ARSperl/ARSperl/example/RCS/ars_GetListSQL.pl,v 1.1 1997/07/23 18:21:29 jcmurphy Exp $
+# $Header: /cvs/ARSperl/example/ars_GetListSQL.pl,v 1.1 1997/07/23 18:21:29 jcmurphy Exp $
 #
 # NAME
 #   ars_GetListSQL.pl

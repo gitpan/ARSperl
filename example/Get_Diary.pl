@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl
 #
-# $Header: /u1/project/ARSperl/ARSperl/example/RCS/Get_Diary.pl,v 1.2 1998/03/31 15:44:00 jcmurphy Exp $
+# $Header: /cvs/ARSperl/example/Get_Diary.pl,v 1.2 1998/03/31 15:44:00 jcmurphy Exp $
 #
 # EXAMPLE
 #    Get_Diary.pl

@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl
 #
-# $Header: /u1/project/ARSperl/ARSperl/example/RCS/GetFilter.pl,v 1.7 1998/10/14 15:06:10 jcmurphy Exp $
+# $Header: /cvs/ARSperl/example/GetFilter.pl,v 1.7 1998/10/14 15:06:10 jcmurphy Exp $
 #
 # NAME
 #   GetFilter.pl

@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl
 #
-# $Header: /u1/project/ARSperl/ARSperl/example/RCS/ars_decodeStatusHistory.pl,v 1.2 1998/09/14 17:39:20 jcmurphy Exp $
+# $Header: /cvs/ARSperl/example/ars_decodeStatusHistory.pl,v 1.2 1998/09/14 17:39:20 jcmurphy Exp $
 #
 # NAME
 #   ars_decodeStatusHistory.pl [server] [username] [password] [schema] [eid]
