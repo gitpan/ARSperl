@@ -1,5 +1,5 @@
 /*
-$Header: /cvs/ARSperl/support-h.template,v 1.6 1999/10/03 04:00:27 jcmurphy Exp $
+$Header: /cvs/ARSperl/support-h.template,v 1.15 2000/08/31 05:31:16 jcmurphy Exp $
 
     ARSperl - An ARS v2 - v4 / Perl5 Integration Kit
 
@@ -21,74 +21,16 @@ $Header: /cvs/ARSperl/support-h.template,v 1.6 1999/10/03 04:00:27 jcmurphy Exp 
     Comments to: arsperl@lurch.cit.buffalo.edu
     Home Page: http://arsinfo.cit.buffalo.edu
  
-    LOG:
-
-$Log: support-h.template,v $
-Revision 1.6  1999/10/03 04:00:27  jcmurphy
-various
-
-Revision 1.5  1999/03/12 07:27:16  jcmurphy
-1.6400 BETA - OO layer and attachments
-
-Revision 1.4  1999/01/04 21:05:14  jcmurphy
-fixed some conditional compilation typos/omissions
-
-Revision 1.3  1998/12/28 15:46:10  jcmurphy
-v1.62
-
-Revision 1.2  1998/09/11 19:36:44  jcmurphy
-added perl_diary prototype
-
-Revision 1.1  1998/08/07 18:38:23  jcmurphy
-Initial revision
-
-Revision 1.13  1998/08/07 16:21:27  jcmurphy
-added ars3.2 def's to ServerInfoMap list
-
-Revision 1.12  1998/05/19 13:10:26  jcmurphy
-fixed strstr/substr typo
-
-Revision 1.11  1998/03/31 23:32:06  jcmurphy
-NT patch by  Bill Middleton <wjm@metronet.com>
-
-Revision 1.1  1998/03/17 15:19:02  aawimi
-Initial revision
-
-Revision 1.9  1997/11/10 23:50:36  jcmurphy
-1.5206: added refreshCode to GetCharMenu().
-added ars_GetVUI to EXPORTS in .pm file
-fixed bug in 1.5205's groupList alteration
-
-Revision 1.8  1997/11/04 18:16:04  jcmurphy
-1.5205: permissions list map
-
-Revision 1.7  1997/10/20 21:00:41  jcmurphy
-5203 beta. code cleanup. winnt additions. malloc/free
-debugging code.
-
-Revision 1.6  1997/10/09 15:21:33  jcmurphy
-1.5201: code cleaning
-
-Revision 1.5  1997/10/09 00:49:28  jcmurphy
-1.52: uninit'd var bug fix
-
-Revision 1.4  1997/10/07 14:29:38  jcmurphy
-1.51
-
-Revision 1.3  1997/10/02 15:39:53  jcmurphy
-1.50beta
-
-Revision 1.2  1997/09/04 00:20:47  jcmurphy
-*** empty log message ***
-
-Revision 1.1  1997/08/05 21:21:11  jcmurphy
-Initial revision
-
 
 */
 
 #ifndef __support_h_
 #define __support_h_
+
+#if (PERL_BASEREV_IS == 50) && (PERL_PATCHLEVEL_IS < 5)
+ #define PL_na na
+ #define PL_sv_undef sv_undef
+#endif
 
 #undef EXTERN
 #ifndef __support_c_
@@ -107,9 +49,16 @@ Initial revision
 #include "nterrno.h"
 #include "ntfree.h"
 #include "ntsextrn.h"
+
+/* the following are defined because we use them as default values in ARS.xs */
+
 #if AR_EXPORT_VERSION < 3
 # define AR_FIELD_TYPE_ALL 0
 # include "ntcextrn.h"
+#endif
+#if AR_EXPORT_VERSION < 5
+# define AR_IMPORT_OPT_CREATE 0
+# define AR_IMPORT_OPT_OVERWRITE 1
 #endif
 
 #include "EXTERN.h"
@@ -143,6 +92,31 @@ typedef struct {
   char         *name;
 } TypeMapStruct;
 
+
+static struct {
+	unsigned int  number;
+	char	     *name;
+} StructItemTypeMap[] = {
+/*STRUCTITEMTYPEMAP*/
+	{ TYPEMAP_LAST, "" }
+};
+
+static struct {
+	unsigned int  number;
+	char	     *name;
+} ServerStatTypeMap[] = {
+/*SERVERSTATTYPEMAP*/
+	{ TYPEMAP_LAST, "" }
+};
+
+static struct {
+	unsigned int  number;
+	char	     *name;
+} SchemaTypeMap[] = {
+/*SCHEMATYPEMAP*/
+	{ TYPEMAP_LAST, "" }
+};
+
 static struct {
 	unsigned int  number;
 	char         *name;
@@ -164,6 +138,14 @@ static struct {
 	char         *name;
 } ActiveLinkActionTypeMap[] = {
 /*ACTIVELINKACTIONTYPEMAP*/
+	{ TYPEMAP_LAST, "" }
+};
+
+static struct {
+	unsigned int  number;
+	char         *name;
+} CharMenuTypeMap[] = {
+/*CHARMENUTYPEMAP*/
 	{ TYPEMAP_LAST, "" }
 };
 
@@ -237,6 +219,14 @@ static struct {
 static struct {
   unsigned int  number;
   char         *name;
+} StatusReturnTypeMap[] = {
+/*STATUSRETURNTYPEMAP*/
+  { TYPEMAP_LAST, "" }
+};
+
+static struct {
+  unsigned int  number;
+  char         *name;
 } ArithOpMap[] = {
   { AR_ARITH_OP_ADD,      "+" },
   { AR_ARITH_OP_SUBTRACT, "-" },
@@ -273,7 +263,83 @@ static struct {
   { TYPEMAP_LAST, NULL }
 };
 
+static struct {
+	unsigned int infoTypeNum;
+	unsigned int infoTypeType;
+} ServerInfoTypeHints[] = {
+	{ AR_SERVER_INFO_ACTLINK_DIR, 		AR_DATA_TYPE_CHAR },
+	{ AR_SERVER_INFO_ACTLINK_SHELL, 	AR_DATA_TYPE_CHAR },
+	{ AR_SERVER_INFO_ADMIN_ONLY, 		AR_DATA_TYPE_INTEGER },
+	{ AR_SERVER_INFO_ADMIN_TCP_PORT, 	AR_DATA_TYPE_INTEGER },
+	{ AR_SERVER_INFO_ALLOW_GUESTS, 		AR_DATA_TYPE_INTEGER },
+	{ AR_SERVER_INFO_AP_DEFN_CHECK, 	AR_DATA_TYPE_INTEGER },
+	{ AR_SERVER_INFO_AP_LOG_FILE, 		AR_DATA_TYPE_CHAR },
+	{ AR_SERVER_INFO_AP_RPC_SOCKET, 	AR_DATA_TYPE_INTEGER },
+	{ AR_SERVER_INFO_API_LOG_FILE, 		AR_DATA_TYPE_CHAR },
+	{ AR_SERVER_INFO_CACHE_LOG_FILE, 	AR_DATA_TYPE_CHAR },
+	{ AR_SERVER_INFO_CLUSTERED_INDEX, 	AR_DATA_TYPE_INTEGER },
+	{ AR_SERVER_INFO_DB_PASSWORD, 		AR_DATA_TYPE_CHAR },
+	{ AR_SERVER_INFO_DBCONF, 		AR_DATA_TYPE_CHAR },
+	{ AR_SERVER_INFO_DEBUG_MODE, 		AR_DATA_TYPE_INTEGER },
+	{ AR_SERVER_INFO_DELAYED_CACHE, 	AR_DATA_TYPE_INTEGER },
+	{ AR_SERVER_INFO_DS_LOG_FILE, 		AR_DATA_TYPE_CHAR },
+	{ AR_SERVER_INFO_DSO_DEST_PORT, 	AR_DATA_TYPE_INTEGER },
+	{ AR_SERVER_INFO_DS_RPC_SOCKET, 	AR_DATA_TYPE_INTEGER },
+#if AR_EXPORT_VERSION >= 5
+	{ AR_SERVER_INFO_EA_RPC_SOCKET, 	AR_DATA_TYPE_INTEGER },
+	{ AR_SERVER_INFO_EA_RPC_TIMEOUT, 	AR_DATA_TYPE_INTEGER },
+	{ AR_SERVER_INFO_EA_SYNC_TIMEOUT, 	AR_DATA_TYPE_INTEGER },
+#endif
+	{ AR_SERVER_INFO_EMAIL_FROM, 		AR_DATA_TYPE_CHAR },
+	{ AR_SERVER_INFO_EMAIL_LINE_LEN, 	AR_DATA_TYPE_INTEGER },
+	{ AR_SERVER_INFO_EMAIL_TIMEOUT, 	AR_DATA_TYPE_INTEGER },
+	{ AR_SERVER_INFO_ESCALATION_LOG_FILE, 	AR_DATA_TYPE_CHAR },
+	{ AR_SERVER_INFO_ESCL_DAEMON, 		AR_DATA_TYPE_INTEGER },
+	{ AR_SERVER_INFO_ESCL_TCP_PORT, 	AR_DATA_TYPE_INTEGER },
+	{ AR_SERVER_INFO_FAST_TCP_PORT, 	AR_DATA_TYPE_INTEGER },
+	{ AR_SERVER_INFO_FILT_MAX_TOTAL, 	AR_DATA_TYPE_INTEGER }, 
+	{ AR_SERVER_INFO_FILT_MAX_STACK, 	AR_DATA_TYPE_INTEGER },
+	{ AR_SERVER_INFO_FILTER_LOG_FILE, 	AR_DATA_TYPE_CHAR },
+	{ AR_SERVER_INFO_FLASH_DAEMON, 		AR_DATA_TYPE_INTEGER },
+	{ AR_SERVER_INFO_FLASH_TCP_PORT, 	AR_DATA_TYPE_INTEGER },
+	{ AR_SERVER_INFO_FLOAT_TIMEOUT, 	AR_DATA_TYPE_INTEGER },
+	{ AR_SERVER_INFO_FTEXT_TIMEOUT, 	AR_DATA_TYPE_INTEGER },
+	{ AR_SERVER_INFO_LIST_TCP_PORT, 	AR_DATA_TYPE_INTEGER },
+	{ AR_SERVER_INFO_MAX_ENTRIES, 		AR_DATA_TYPE_INTEGER },
+	{ AR_SERVER_INFO_MAX_F_DAEMONS, 	AR_DATA_TYPE_INTEGER },
+	{ AR_SERVER_INFO_MAX_L_DAEMONS, 	AR_DATA_TYPE_INTEGER },
+#if AR_EXPORT_VERSION >= 5
+	{ AR_SERVER_INFO_MAX_LOG_FILE_SIZE, 	AR_DATA_TYPE_INTEGER },
+#endif
+	{ AR_SERVER_INFO_NFY_TCP_PORT, 		AR_DATA_TYPE_INTEGER },
+	{ AR_SERVER_INFO_PS_RPC_SOCKET, 	AR_DATA_TYPE_INTEGER },
+	{ AR_SERVER_INFO_REGISTER_PORTMAPPER, 	AR_DATA_TYPE_INTEGER },
+	{ AR_SERVER_INFO_SAVE_LOGIN, 		AR_DATA_TYPE_INTEGER },
+#if AR_EXPORT_VERSION >= 5
+	{ AR_SERVER_INFO_SCC_ENABLED, 		AR_DATA_TYPE_INTEGER },
+	{ AR_SERVER_INFO_SCC_PROVIDER_NAME, 	AR_DATA_TYPE_CHAR },
+	{ AR_SERVER_INFO_SCC_TARGET_DIR, 	AR_DATA_TYPE_CHAR },
+	{ AR_SERVER_INFO_SCC_COMMENT_CHECKIN, 	AR_DATA_TYPE_CHAR },
+	{ AR_SERVER_INFO_SCC_COMMENT_CHECKOUT, 	AR_DATA_TYPE_CHAR },
+#endif
+	{ AR_SERVER_INFO_SERVER_NAME, 		AR_DATA_TYPE_CHAR },
+	{ AR_SERVER_INFO_SET_PROC_TIME, 	AR_DATA_TYPE_INTEGER },
+	{ AR_SERVER_INFO_SQL_LOG_FILE, 		AR_DATA_TYPE_CHAR },
+	{ AR_SERVER_INFO_SUBMITTER_MODE, 	AR_DATA_TYPE_INTEGER },
+	{ AR_SERVER_INFO_SUPPRESS_WARN, 	AR_DATA_TYPE_CHAR },
+	{ AR_SERVER_INFO_TCD_TCP_PORT, 		AR_DATA_TYPE_INTEGER },
+	{ AR_SERVER_INFO_THREAD_LOG_FILE, 	AR_DATA_TYPE_CHAR },
+	{ AR_SERVER_INFO_UNQUAL_QUERIES, 	AR_DATA_TYPE_INTEGER },
+	{ AR_SERVER_INFO_USE_ETC_PASSWD, 	AR_DATA_TYPE_INTEGER },
+	{ AR_SERVER_INFO_USER_CACHE_UTILS, 	AR_DATA_TYPE_INTEGER },
+	{ AR_SERVER_INFO_USER_LOG_FILE, 	AR_DATA_TYPE_CHAR },
+	{ AR_SERVER_INFO_XREF_PASSWORDS, 	AR_DATA_TYPE_INTEGER },
+	{ TYPEMAP_LAST,                         TYPEMAP_LAST }
+};
+
 EXTERN char *lookUpTypeName(TypeMapStruct *t, unsigned int v);
+EXTERN unsigned int  lookUpServerInfoTypeHint(unsigned int itn);
+EXTERN unsigned int  caseLookUpTypeNumber(TypeMapStruct *t, char *s);
 
 /* typedef SV* (*ARS_fn)(void *); */
 typedef void *(*ARS_fn)(ARControlStruct *ctrl, void *b);
@@ -295,6 +361,10 @@ EXTERN SV *perl_ARPermissionList(ARControlStruct *ctrl,  ARPermissionList *in, i
 EXTERN SV *perl_ARStatusStruct(ARControlStruct *ctrl,  ARStatusStruct *);
 #if AR_EXPORT_VERSION >= 4
 EXTERN SV *perl_ARMessageStruct(ARControlStruct *ctrl,  ARMessageStruct *);
+#endif
+#if AR_EXPORT_VERSION >= 5
+EXTERN SV *perl_ARWorkflowConnectStruct(ARControlStruct * ctrl, ARWorkflowConnectStruct * in);
+EXTERN SV *perl_ARNameList(ARControlStruct * ctrl, ARNameList * in);
 #endif
 EXTERN SV *perl_ARInternalId(ARControlStruct *ctrl,  ARInternalId *);
 EXTERN SV *perl_ARNameType(ARControlStruct *ctrl,  ARNameType *);
@@ -361,7 +431,8 @@ EXTERN int ARGetFieldCached( ARControlStruct *, ARNameType, ARInternalId,
 EXTERN int sv_to_ARValue(ARControlStruct *ctrl, 
 			 SV *in, unsigned int dataType, ARValueStruct *out);
 #if AR_EXPORT_VERSION >= 3
-EXTERN SV *perl_ARPropStruct(ARControlStruct *ctrl,  ARPropStruct *);
+EXTERN SV *perl_ARPropStruct(ARControlStruct *ctrl,  ARPropStruct *in);
+EXTERN SV *perl_ARPropList(ARControlStruct *ctrl, ARPropList *in);
 EXTERN SV *perl_ARDisplayInstanceStruct(ARControlStruct *ctrl,
 				  ARDisplayInstanceStruct *);
 EXTERN SV *perl_ARDisplayInstanceList(ARControlStruct *ctrl,  ARDisplayInstanceList *);
@@ -467,6 +538,5 @@ int  copymem(MEMCAST *m1, MEMCAST *m2, int size);
 #define AP_ERR_PREREVFAIL   80024, "Failed to convert some perl structures to ars structures. Create/Set operation aborted."
 #define AP_ERR_ATTACH       80025  /* roll your own text */
 #define AP_ERR_INV_ARGS     80026 /* roll your own - invalid argument(s) */
-
 
 #endif /* __support_h_ */
