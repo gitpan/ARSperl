@@ -67,6 +67,8 @@ require Config;
 @ISA = qw(Exporter DynaLoader);
 @EXPORT = qw(isa_int isa_float isa_string ars_LoadQualifier ars_Login ars_Logoff ars_GetListField ars_GetFieldByName ars_GetFieldTable ars_CreateEntry ars_DeleteEntry ars_GetEntry ars_GetListEntry ars_GetListSchema ars_GetListServer ars_GetActiveLink ars_GetCharMenuItems ars_GetSchema ars_GetField ars_simpleMenu ars_GetListActiveLink ars_SetEntry ars_perl_qualifier ars_Export ars_GetListFilter ars_GetListEscalation ars_GetListCharMenu ars_GetListAdminExtension ars_padEntryid ars_GetFilter ars_GetProfileInfo ars_Import ars_GetCharMenu ars_GetServerStatistics ars_NTDeregisterServer ars_NTGetListServer ars_NTInitializationServer ars_NTNotificationServer ars_NTTerminationServer ars_NTDeregisterClient ars_NTInitializationClient ars_NTRegisterClient ars_NTTerminationClient ars_NTRegisterServer ars_GetCurrentServer %ARServerStats ars_EncodeDiary ars_MergeEntry);
 
+$VERSION = '1.46';
+
 bootstrap ARS;
 tie $main::ars_errstr, ARS::ERRORSTR;
 

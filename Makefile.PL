@@ -34,7 +34,7 @@ $ARS_LIBS = "-lar -lnsl -lnts";
 
 WriteMakefile(
 	      'NAME'	=> 'ARS',
-	      'VERSION'	=> '1.46',
+              'VERSION_FROM' => 'ARS.pm',
 	      'LIBS'	=> ["${ARS_LDPATH} ${ARS_LIBS}"],
 
 # DEFINE OPTIONS:

@@ -1967,13 +1967,7 @@ ars_Logoff(ctrl,a=0,b=0,c=1)
 	    int ret;
 	    ARStatusList status;
 	    if (!ctrl) return;
-	    ret = XARReleaseCurrentUser(ctrl, ctrl->user, &status, a, b, c);
-	    ARError(ret, status);
-	/*
 	    ret = ARTermination(&status);
-	    ARError(ret, status);
-	    free(ctrl);
-	*/
 	}
 
 void
