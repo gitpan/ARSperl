@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl
 #
-# $Header: /cvs/ARSperl/Makefile.PL,v 1.31 2000/10/30 19:49:16 jcmurphy Exp $
+# $Header: /cvs/ARSperl/Makefile.PL,v 1.41 2001/11/13 14:24:09 jcmurphy Exp $
 #
 # ARSperl Makefile
 #
@@ -24,33 +24,45 @@ $debug = 0;
 # STEP 1 -> Set the path to your ARS API directory
 
 $ARSAPI     = "/usr/ar/api";
-#$ARSAPI     = "/u1/project/ARSperl/api/sol2/api3.0";
-#$ARSAPI     = "/u1/project/ARSperl/api/linux/4.0";
-#$ARSAPI     = "/home/jcmurphy/arsperl/api/4.0";
+#$ARSAPI     = "/u1/project/ARSperl/api/sol2/api4.5.2";
+#$ARSAPI     = "/u1/project/ARSperl/api/linux/4.5";
+#$ARSAPI     = "/home/jcmurphy/arsperl/api/4.5";
 
-# STEP 2 -> Choose your version of ARS
-#           example: 2.0 2.1 3.0 3.1 3.2 4.0
-#           note: don't include the maint number (e.g. use 3.2 NOT 3.2.1)
+# STEP 2 -> Choose your version of ARS FROM THE FOLLOWING LIST
+#
+#                  2.0 2.1 3.0 3.1 3.2 4.0 4.52
+#
+#           notes
+#            - if there is a maintenace number (e.g. 4.5.2)
+#              then use "4.52" NOT "4.5.2"
+#            - ONLY use the choices listed above. note that
+#              not all versions are on the list. specify the
+#              version that is closest to yours without exceeding
+#              your version (e.g. for 4.5 you would specify 4.0, NOT
+#	       4.52)
+#           
+$ARSVERSION = 4.52;
 
-$ARSVERSION = 4.0;
+
 
 # unless you run into problems, you shouldn't need to read any further.
 # if you do run into problems, and don't really know what this file
 # does, try subscribing to the mailing list and ask for help there.
-# subscription information is available at http://arsinfo.cit.buffalo.edu/perl
+# subscription information is available at http://www.arsperl.org/
 
 $WINDOWS = ($^O eq 'MSWin32');
 
 #        Windows NT: no "-lpthread"
 #        NCR UNIX: add "-lc -lnet"
-
-$AUTODEFINES = " -DPROFILE -g ";
+#                -DARSPDEBUG
+$AUTODEFINES = " -DARSPDEBUG  -DPROFILE -g ";
 $AUTODEFINES = "-D_WIN32" if($WINDOWS);
 
 if($ARSVERSION >= 4.0) {
   $ARS_LIBS = "-lar -lnsl -lnts";
   $ARS_LIBS .= " -lpthread" unless $WINDOWS;
   $AUTODEFINES .= " -DARS32 ";	
+  $AUTODEFINES .= " -DARS452 " if($ARSVERSION >= 4.52);
 }
 
 elsif($ARSVERSION >= 3.0 && $ARSVERSION < 4.0) {
@@ -112,7 +124,7 @@ foreach ("ar", "arerrno", "nt", "nterrno") {
 }
 
 print "Configuring with options:\n";
-printf "\tARSVERSION  = %.1f\n", $ARSVERSION;
+printf "\tARSVERSION  = %.2f\n", $ARSVERSION;
 print "\tARSAPI      = $ARSAPI\n";
 print "\tAUTODEFINES = $AUTODEFINES\n";
 
@@ -146,7 +158,7 @@ WriteMakefile(
 #
 #    -D_WIN32
 #
-#       If you are compiling ARSperl until windows, define this
+#       If you are compiling ARSperl under windows, define this
 #       and /don't/ define PROFILE.
 #
 #    -DSKIP_SV_ISA  (not automatically set)
@@ -380,6 +392,7 @@ sub GenerateSupportDotH {
 
 		print "\t\t$code\n" if $debug;
 		$code =~ /^AR_SERVER_INFO_(\w+)/;
+		next if ($1 eq "MIN_AUDIT_LOG_FILE_SIZE");
 		print FD "  { $code, \t\"$1\" },\n";
 	    }
 	}

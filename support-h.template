@@ -1,5 +1,5 @@
 /*
-$Header: /cvs/ARSperl/support-h.template,v 1.17 2000/10/30 19:49:16 jcmurphy Exp $
+$Header: /cvs/ARSperl/support-h.template,v 1.20 2001/10/30 14:47:02 jcmurphy Exp $
 
     ARSperl - An ARS v2 - v4 / Perl5 Integration Kit
 
@@ -71,6 +71,13 @@ $Header: /cvs/ARSperl/support-h.template,v 1.17 2000/10/30 19:49:16 jcmurphy Exp
 
 #ifdef PROFILE
 # include <sys/time.h>
+#endif
+
+#define SAFEPRT(X) (X && *X)? X : "[null]"
+#ifdef ARSPDEBUG
+# define DBG(X) printf("[%s %d] %s : ", __FILE__, __LINE__, __FUNCTION__); printf X
+#else
+# define DBG(X)
 #endif
 
 typedef struct {
@@ -394,6 +401,9 @@ EXTERN int          NTError( int returncode, NTStatusList status);
 EXTERN SV *perl_diary(ARControlStruct *ctrl, ARDiaryStruct *in);
 EXTERN SV *perl_MenuRefreshCode2Str(ARControlStruct *ctrl,  unsigned int rc);
 EXTERN SV *perl_ARPermissionList(ARControlStruct *ctrl,  ARPermissionList *in, int);
+#ifdef ARS452
+EXTERN SV *perl_ARFilterStatusStruct(ARControlStruct *ctrl,  ARFilterStatusStruct *);
+#endif
 EXTERN SV *perl_ARStatusStruct(ARControlStruct *ctrl,  ARStatusStruct *);
 #if AR_EXPORT_VERSION >= 4
 EXTERN SV *perl_ARMessageStruct(ARControlStruct *ctrl,  ARMessageStruct *);
@@ -574,5 +584,6 @@ int  copymem(MEMCAST *m1, MEMCAST *m2, int size);
 #define AP_ERR_PREREVFAIL   80024, "Failed to convert some perl structures to ars structures. Create/Set operation aborted."
 #define AP_ERR_ATTACH       80025  /* roll your own text */
 #define AP_ERR_INV_ARGS     80026 /* roll your own - invalid argument(s) */
+#define AP_ERR_INV_ARITH    80027 /*, "Unknown arith operation in ARArithOpStruct" */
 
 #endif /* __support_h_ */

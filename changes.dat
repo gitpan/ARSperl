@@ -1,3 +1,21 @@
+released=11/13/2001 version=1.73
+JCM fixed windows cpp error in support.c
+JCM fixed a leftover fprintf warning in support.c that was causing
+    compilation warnings on windows
+JCM disabled t/11entry.t
+JCM minor Makefile.PL tweak
+JCM bug fix in perl_ARStatusStruct that caused segv with api >= 4.0
+
+released=10/24/2001 version=1.72
+JCM modified Makefile.PL to handle changes to _SERVER_INFO definitions
+    in 4.5.x
+JCM memory leak fixes
+JCM duplicate free badness in ars_Login() fixed
+JCM updated doc for ars_MergeEntry
+JCM added form->merge() call to OO layer
+JCM fixed 4.5.2 induced warning (now there's a FilterActionStruct)
+    modified Makefile.PL so you can specify ARVERSION=4.52 
+
 released=10/30/2000 version=1.71
 JCM modified support-h.template to compile against api3.0
 
