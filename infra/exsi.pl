@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 #
-# $Header: /cvs/ARSperl/infra/exsi.pl,v 1.1 2003/03/27 18:00:04 jcmurphy Exp $
+# $Header: /cvsroot/arsperl/ARSperl/infra/exsi.pl,v 1.1 2003/03/27 18:00:04 jcmurphy Exp $
 #
 # NAME
 #   exsi.pl < ar.h > server_info_type_hints.h

@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl
 #
-# $Header: /cvs/ARSperl/example/ListNTServers.pl,v 1.1 1997/02/13 15:49:45 jcmurphy Exp $
+# $Header: /cvsroot/arsperl/ARSperl/example/ListNTServers.pl,v 1.1 1997/02/13 15:49:45 jcmurphy Exp $
 #
 # USAGE
 #   ListNTServers.pl 

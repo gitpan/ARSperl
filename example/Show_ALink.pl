@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl
 #
-# $Header: /cvs/ARSperl/example/Show_ALink.pl,v 1.6 2000/06/01 16:54:03 jcmurphy Exp $
+# $Header: /cvsroot/arsperl/ARSperl/example/Show_ALink.pl,v 1.6 2000/06/01 16:54:03 jcmurphy Exp $
 #
 # EXAMPLE
 #    Show_ALink.pl

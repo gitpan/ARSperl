@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl
 #
-# $Header: /cvs/ARSperl/example/ars_SetServerInfo.pl,v 1.1 2000/08/31 05:18:41 jcmurphy Exp $
+# $Header: /cvsroot/arsperl/ARSperl/example/ars_SetServerInfo.pl,v 1.1 2000/08/31 05:18:41 jcmurphy Exp $
 #
 # NAME
 #   ars_SetServerInfo.pl

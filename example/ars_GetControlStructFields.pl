@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl
 #
-# $Header: /cvs/ARSperl/example/ars_GetControlStructFields.pl,v 1.1 1997/10/29 21:56:43 jcmurphy Exp $
+# $Header: /cvsroot/arsperl/ARSperl/example/ars_GetControlStructFields.pl,v 1.1 1997/10/29 21:56:43 jcmurphy Exp $
 #
 # NAME
 #   ars_GetControlStructFields.pl

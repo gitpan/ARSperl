@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl
 #
-# $Header: /cvs/ARSperl/example/Dump_Setup.pl,v 1.3 1999/06/14 17:07:39 jcmurphy Exp $
+# $Header: /cvsroot/arsperl/ARSperl/example/Dump_Setup.pl,v 1.3 1999/06/14 17:07:39 jcmurphy Exp $
 #
 # EXAMPLE
 #    Dump_Setup.pl [username] [password] [path]

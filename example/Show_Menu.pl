@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl
 #
-# $Header: /cvs/ARSperl/example/Show_Menu.pl,v 1.1 1996/11/21 20:13:56 jcmurphy Exp $
+# $Header: /cvsroot/arsperl/ARSperl/example/Show_Menu.pl,v 1.1 1996/11/21 20:13:56 jcmurphy Exp $
 #
 # EXAMPLE
 #    Show_Menu.pl

@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl
 #
-# $Header: /cvs/ARSperl/example/GetField.pl,v 1.4 1998/09/11 14:46:18 jcmurphy Exp $
+# $Header: /cvsroot/arsperl/ARSperl/example/GetField.pl,v 1.4 1998/09/11 14:46:18 jcmurphy Exp $
 #
 # EXAMPLE
 #    GetField.pl [server] [username] [password] [schema] [fieldname]

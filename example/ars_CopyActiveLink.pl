@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl
 #
-# $Header: /cvs/ARSperl/example/ars_CopyActiveLink.pl,v 1.2 1998/09/14 17:38:47 jcmurphy Exp $
+# $Header: /cvsroot/arsperl/ARSperl/example/ars_CopyActiveLink.pl,v 1.2 1998/09/14 17:38:47 jcmurphy Exp $
 #
 # NAME
 #   ars_CopyActiveLink.pl [server] [username] [password] [active link]

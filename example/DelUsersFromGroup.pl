@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl
 #
-# $Header: /cvs/ARSperl/example/DelUsersFromGroup.pl,v 1.2 1998/09/14 20:50:08 jcmurphy Exp $
+# $Header: /cvsroot/arsperl/ARSperl/example/DelUsersFromGroup.pl,v 1.2 1998/09/14 20:50:08 jcmurphy Exp $
 #
 # NAME
 #   DelUsersFromGroup group user1 [user2] ...

@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl
 #
-# $Header: /cvs/ARSperl/example/GetCharMenu.pl,v 1.8 2003/03/28 05:51:56 jcmurphy Exp $
+# $Header: /cvsroot/arsperl/ARSperl/example/GetCharMenu.pl,v 1.8 2003/03/28 05:51:56 jcmurphy Exp $
 #
 # NAME
 #   GetCharMenu.pl

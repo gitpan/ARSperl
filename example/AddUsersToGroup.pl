@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl
 #
-# $Header: /cvs/ARSperl/example/AddUsersToGroup.pl,v 1.3 2003/03/28 05:51:56 jcmurphy Exp $
+# $Header: /cvsroot/arsperl/ARSperl/example/AddUsersToGroup.pl,v 1.3 2003/03/28 05:51:56 jcmurphy Exp $
 #
 # NAME
 #   AddUsersToGroup server user password group user1 [user2] ...

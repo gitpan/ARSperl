@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl
 #
-# $Header: /cvs/ARSperl/example/PrintQual.pl,v 1.2 1999/10/03 04:09:08 jcmurphy Exp $
+# $Header: /cvsroot/arsperl/ARSperl/example/PrintQual.pl,v 1.2 1999/10/03 04:09:08 jcmurphy Exp $
 #
 # EXAMPLE
 #    PrintQual.pl

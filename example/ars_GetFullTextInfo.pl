@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl
 #
-# $Header: /cvs/ARSperl/example/ars_GetFullTextInfo.pl,v 1.1 1997/07/23 18:21:29 jcmurphy Exp $
+# $Header: /cvsroot/arsperl/ARSperl/example/ars_GetFullTextInfo.pl,v 1.1 1997/07/23 18:21:29 jcmurphy Exp $
 #
 # NAME
 #   ars_GetFullTextInfo.pl

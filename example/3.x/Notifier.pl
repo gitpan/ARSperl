@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl
 #
-# $Header: /cvs/ARSperl/example/3.x/Notifier.pl,v 1.2 1999/10/03 04:10:17 jcmurphy Exp $
+# $Header: /cvsroot/arsperl/ARSperl/example/3.x/Notifier.pl,v 1.2 1999/10/03 04:10:17 jcmurphy Exp $
 #
 # USAGE
 #   notifier.pl 

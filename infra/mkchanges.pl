@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl
 #
-# $Header: /cvs/ARSperl/infra/mkchanges.pl,v 1.6 2003/03/27 17:58:42 jcmurphy Exp $
+# $Header: /cvsroot/arsperl/ARSperl/infra/mkchanges.pl,v 1.6 2003/03/27 17:58:42 jcmurphy Exp $
 #
 # mkchanges.pl [-t] -f changes.dat
 #

@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl
 #
-# $Header: /cvs/ARSperl/example/3.x/SendNotification.pl,v 1.3 2000/07/03 15:01:44 jcmurphy Exp $
+# $Header: /cvsroot/arsperl/ARSperl/example/3.x/SendNotification.pl,v 1.3 2000/07/03 15:01:44 jcmurphy Exp $
 #
 # NAME
 #   SendNotification.pl [server] [user] [message]

@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl
 #
-# $Header: /cvs/ARSperl/example/ars_GetListUser.pl,v 1.2 2001/04/11 15:10:15 jcmurphy Exp $
+# $Header: /cvsroot/arsperl/ARSperl/example/ars_GetListUser.pl,v 1.2 2001/04/11 15:10:15 jcmurphy Exp $
 #
 # NAME
 #   ars_GetListUser.pl

@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl
 #
-# $Header: /cvs/ARSperl/example/WhoUsesIt.pl,v 1.2 2003/04/02 05:12:22 jcmurphy Exp $
+# $Header: /cvsroot/arsperl/ARSperl/example/WhoUsesIt.pl,v 1.2 2003/04/02 05:12:22 jcmurphy Exp $
 #
 # NAME 
 #   WhoUsesIt.pl

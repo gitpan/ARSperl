@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl
 #
-# $Header: /cvs/ARSperl/infra/pcpp.pl,v 1.2 2000/08/31 02:12:05 jcmurphy Exp $
+# $Header: /cvsroot/arsperl/ARSperl/infra/pcpp.pl,v 1.2 2000/08/31 02:12:05 jcmurphy Exp $
 #
 # pcpp.pl
 #

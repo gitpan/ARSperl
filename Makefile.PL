@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl
 #
-# $Header: /cvs/ARSperl/Makefile.PL,v 1.52 2003/09/04 15:34:42 jcmurphy Exp $
+# $Header: /cvsroot/arsperl/ARSperl/Makefile.PL,v 1.56 2004/09/19 22:27:24 jeffmurphy Exp $
 #
 # ARSperl Makefile
 #
@@ -16,22 +16,37 @@
 require 5.004;
 use ExtUtils::MakeMaker;
 use Config;
+use Cwd;
+
 
 $debug = 0;
 
-###### There are TWO (2) steps to complete. Complete both of them. ######
+###### There are THREE (3) steps to complete. Complete all of them. ######
 
 # STEP 1 -> Set the path to your ARS API directory
 
-$ARSAPI     = "/usr/ar/api";
-$ARSAPI     = "/u1/project/ARSperl/api/sol2/api5.1.1";
-$ARSAPI     = "/u1/project/ARSperl/api/linux/5.1.1";
-$ARSAPI     = "/u1/project/ARSperl/api/linux/4.0";
-#$ARSAPI     = "/home/jcmurphy/arsperl/api/5.1";
+#$ARSAPI     = "/usr/ar/api";
+#$ARSAPI     = "/u1/project/ARSperl/api/sol2/api5.1.1";
+#$ARSAPI     = "/u1/project/ARSperl/api/linux/4.5";
+#$ARSAPI     = "/u1/project/ARSperl/api/linux/4.0";
+#$ARSAPI     = "/u1/project/ARSperl/api/linux/5.1.1";
+$ARSAPI     = "/home/jcmurphy/arsperl/api/5.1";
+# $ARSAPI     = q{\\\\ess7\devkits\ars\4.5\drops\drop4.5FCS\winnt};
+# $ARSAPI     = q{\\\\ess7\devkits\ars\4.5\drops\drop4.5.1FCS\winnt};
+# $ARSAPI     = q{\\\\ess7\devkits\ars\4.5\drops\drop4.5.2FCS\winnt};
+# $ARSAPI     = q{\\\\ess7\devkits\ars\5.0\fcs\winnt};
+# $ARSAPI     = q{\\\\ess7\devkits\ars\5.0.1\fcs\winnt};
+# $ARSAPI     = q{\\\\ess7\devkits\ars\5.1\fcs\winnt};
+# $ARSAPI     = q{\\\\ess7\devkits\ars\5.1.1\fcs\winnt};
+# $ARSAPI     = q{\\\\ess7\devkits\ars\5.1.2\fcs\winnt};
+# $ARSAPI     = q{\\\\ess7\devkits\ars\6.0\fcs\winnt};
+#$ARSAPI      = q{c:\Progra~1\ARSystem6.0.1\Arserver\Api};
+# $ARSAPI      = q{c:\Program Files\ARSystem6.0.1\Arserver\Api};
+# $ARSAPI     = q{\\\\ess7\devkits\ars\6.3\current\winnt};
 
 # STEP 2 -> Choose your version of ARS FROM THE FOLLOWING LIST
 #
-#                  2.0 2.1 3.0 3.1 3.2 4.0 4.52 5.0
+#                  2.0 2.1 3.0 3.1 3.2 4.0 4.52 5.0 6.0 6.01
 #
 #           notes
 #            - if there is a maintenace number (e.g. 4.5.2)
@@ -41,9 +56,29 @@ $ARSAPI     = "/u1/project/ARSperl/api/linux/4.0";
 #              version that is closest to yours without exceeding
 #              your version (e.g. for 4.5 you would specify 4.0, NOT
 #	       4.52)
-#           
-$ARSVERSION = 4.0;
+#
+$ARSVERSION = 5.0;
 
+# STEP 3 -> Choose whether or not to enable encryption
+#
+# 0 -> No encryption library linking
+# 1 -> Link against Remedy's encryption library
+$ENCRYPT = 0;
+
+# my $AR_API_VERSION = findAPIVersion($ARSAPI);
+# print "found API Version: $AR_API_VERSION\n";
+# my $SERVER_VERSION = serverReleaseFromAPIVersion($AR_API_VERSION);
+# unless ($SERVER_VERSION) {
+#   die "couldn't derive a server version from API version: $AR_API_VERSION\n";
+# }
+# print "derived server version from ar.h: $SERVER_VERSION\n";
+
+my $ra_arlibs = findArLibs($ARSAPI);
+# use Data::Dumper;
+# print "found ar libraries: ", Dumper($ra_arlibs);
+
+
+##############################
 # unless you run into problems, you shouldn't need to read any further.
 # if you do run into problems, and don't really know what this file
 # does, try subscribing to the mailing list and ask for help there.
@@ -57,8 +92,26 @@ $WINDOWS = ($^O eq 'MSWin32');
 $AUTODEFINES = " -g ";
 $AUTODEFINES = "-D_WIN32" if($WINDOWS);
 
-if($ARSVERSION >= 4.0) {
+
+if ($ARSVERSION >= 6.0) {
+  $ARS_LIBS = "-lar";
+  if ($WINDOWS) {
+    $ARS_LIBS = join(' ', map { '-l' . $_ } @{$ra_arlibs});
+  } else {
+    $ARS_LIBS .= " -lpthread";
+  }
+  $AUTODEFINES .= " -DARS32 ";	
+  $AUTODEFINES .= " -DARS452 " if($ARSVERSION >= 4.52);
+  if ( ($ARSVERSION >= 5.0) && ($^O eq 'linux') ) {
+    $AUTODEFINES .= " -malign-double ";
+  }
+}
+
+elsif($ARSVERSION >= 4.0) {
   $ARS_LIBS = "-lar -lnsl";
+  if($ENCRYPT == 1) {
+    $ARS_LIBS = "-lar -larencrypt -lnsl";
+  } 
   $ARS_LIBS .= " -lnts" unless ($ARSVERSION >= 5.0);
   $ARS_LIBS .= " -lpthread" unless $WINDOWS;
   $AUTODEFINES .= " -DARS32 ";	
@@ -542,3 +595,106 @@ production ARSystem server.
 	close(FD);
 
 }
+
+
+
+#
+# given a path to the Api directory, go find ar.h and parse the value
+#  of the AR_CURRENT_API_VERSION #define and return it.
+# if the path to ar.h is, e.g.,
+#  c:\Program Files\ARSystem6.0.1\Arserver\Api\include\ar.h
+# then this method wants an appropriately quoted
+#  c:\Program Files\ARSystem6.0.1\Arserver\Api
+# as its first arg
+#
+sub findAPIVersion {
+  my $path_to_api_dir = shift;
+
+  my $ar_fname = join('/', $path_to_api_dir, 'include', 'ar.h');
+  open ($ar_fh, '<', $ar_fname) or
+    die "couldn't open ar.h include file from: \"$ar_fname\": $!\n";
+
+  my $api_version = undef;
+
+  # the line we want to parse looks like:
+  #
+  ##define AR_CURRENT_API_VERSION       10  /* current api version */
+  while (<$ar_fh>) {
+    chomp;
+    if (m/^\s*#define\s*AR_CURRENT_API_VERSION\s*(\d+)/) {
+      $api_version = $1;
+      last;
+    }
+  }
+
+  close $ar_fh;
+  return $api_version;
+}
+
+
+#
+# given an API version from above, return the minimum server version
+#  that supports it.
+# That is, if an API version is supported by multiple releases of the
+#  AR System Server, we return the chronologically first version
+#  since compiling against that version will have been the first
+#  time we have arsperl will have to change to support the API change.
+#
+# this whole strategy of deriving the server version from the api version
+#  presumes that we won't have to distinguish between releases of the
+#  same api version, which may or may not be correct.
+#
+# the api version can be the main variable arsperl uses to adjust
+#  itself however.
+#
+
+sub serverReleaseFromAPIVersion {
+  my $api_version = shift;
+
+  # keys are server releases converted to floating point numbers;
+  #  values are the api version that release produced.
+  # add more values to this table as needed.
+  my $rh_api_version_table =
+    {
+     4.5  => 7,
+     4.51 => 7,
+     4.52 => 7,
+     5.0  => 8,
+     5.01 => 8,
+     5.1  => 9,
+     5.11 => 9,
+     5.12 => 9,
+     6.0  => 10,
+     6.01 => 10,
+     6.3  => 11,
+    };
+
+  my @api_list = ();
+  # make a sorted list from the api version / server release values
+  #  that match our api version.
+  while (($server_rel, $api) = each %{$rh_api_version_table}) {
+    if ($api_version == $api) {
+      push @api_list, $server_rel;
+    }
+  }
+
+  # make sure the values are treated as numbers during the sort
+  my @sorted = sort { ($a + 0) <=> ($b + 0) }@api_list;
+
+  return $sorted[0];
+}
+
+sub findArLibs {
+  my $path_to_api_dir = shift;
+
+  my $cwd = getcwd();
+  my $ar_lib_dir = join('/', $path_to_api_dir, 'lib');
+  chdir($ar_lib_dir);
+
+  # we want all of the files that end in .lib on win32
+  my @libs = <*.lib>;
+  chdir($cwd);
+
+  return \@libs;
+}
+

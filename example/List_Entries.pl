@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl
 #
-# $Header: /cvs/ARSperl/example/List_Entries.pl,v 1.1 1996/11/21 20:13:54 jcmurphy Exp $
+# $Header: /cvsroot/arsperl/ARSperl/example/List_Entries.pl,v 1.1 1996/11/21 20:13:54 jcmurphy Exp $
 #
 # EXAMPLE
 #    List_Entries.pl

@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl
 #
-# $Header: /cvs/ARSperl/example/ars_MergeEntry.pl,v 1.1 1998/02/09 17:57:04 jcmurphy Exp $
+# $Header: /cvsroot/arsperl/ARSperl/example/ars_MergeEntry.pl,v 1.1 1998/02/09 17:57:04 jcmurphy Exp $
 #
 # NAME
 #   ars_MergeEntry.pl [server] [user] [password] [schema] [diaryfieldname] 
