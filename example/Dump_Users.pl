@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl
 #
-# $Header: /u1/project/ARSperl/ARSperl/example/RCS/Dump_Users.pl,v 1.3 1997/09/30 04:49:13 jcmurphy Exp $
+# $Header: /u1/project/ARSperl/ARSperl/example/RCS/Dump_Users.pl,v 1.2 1997/02/19 22:41:25 jcmurphy Exp $
 #
 # EXAMPLE
 #    Dump_Users.pl
@@ -19,10 +19,6 @@
 # 01/12/96
 #
 # $Log: Dump_Users.pl,v $
-# Revision 1.3  1997/09/30 04:49:13  jcmurphy
-# added some error output
-# /
-#
 # Revision 1.2  1997/02/19 22:41:25  jcmurphy
 # misspelling
 #
@@ -46,12 +42,12 @@ if(!defined($password)) {
 # Log onto the ars server specified
 
 ($ctrl = ars_Login($server, $username, $password)) || 
-    die "can't login to the server: $ars_errstr";
+    die "can't login to the server";
 
 # Load the qualifier structure with a dummy qualifier.
 
 ($qual = ars_LoadQualifier($ctrl,$SCHEMA,"(1 = 1)")) ||
-    die "error in ars_LoadQualifier: $ars_errstr";
+    die "error in ars_LoadQualifier";
 
 # Retrieve all of the entry-id's for the schema.
 
@@ -59,10 +55,10 @@ if(!defined($password)) {
 
 # Retrieve the fieldid's for the "Login name" and "Full name" fields.
 
-($loginname_fid = ars_GetFieldByName($ctrl, $SCHEMA, "Login name")) ||
+$loginname_fid = ars_GetFieldByName($ctrl, $SCHEMA, "Login name") ||
     die "no such field in this schema: 'Login name'";
 
-($fullname_fid = ars_GetFieldByName($ctrl, $SCHEMA, "Full Name")) ||
+$fullname_fid = ars_GetFieldByName($ctrl, $SCHEMA, "Full Name") ||
     die "no such field in this schema: 'Full Name'";
 
 # Loop over all of the entries (in ascending order)

@@ -37,12 +37,11 @@ function without it.
    directory that allows script executing (refer to your server specific 
    documentation on enabling them). 
 
-2) Set the path to perl in the ars_web_cl.cgi, ars_web_serv
-   files (very first line) 
+2) Set the path to perl in the ars_web.cgi file (very first line) 
    to the location where the "perl" executable is on your system. 
 
-3) Set the $ARS_SERVER name to the hostname of your ARS server (line #41 in
-   the ars_web_serv script. (optional)
+3) Set the $ARS_SERVER name to the hostname of your ARS server (line #7 in
+   the ars_web.cgi script. (optional)
 
 4) If you want active links enabled, then set $ACTIVE_LINKS="on".
    They are currently only partially working.

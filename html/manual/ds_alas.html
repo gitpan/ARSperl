@@ -1,40 +1,23 @@
 <HTML>
 <HEAD>
-<TITLE>ARSperl Manual - Active Link Action Structure</TITLE>
+<TITLE>ARSperl Programmer's Manual</TITLE>
 </HEAD>
 <BODY BGCOLOR="#FFFFFF">
 
-<H2>Active Link Action Structure</H2>
+<H4>Active Link Action Structure</H4>
 
 <PRE>
-{
- "macro"            =&gt; reference to <A HREF="ds_alms.html">Active Link Macro Structure</A>,
-      <I>or</I> 
- "assign_fields"    =&gt; reference to <A HREF="ds_fas.html">Field Assign Structure</A>,
-      <I>or</I> 
- "process"          =&gt; string,
-      <I>or</I> 
- "message"          =&gt; <A HREF="ds_statstruct_hash.html">Status Structure</A>, <B>(See notes)</B>
-      <I>or</I> 
- "characteristics"  =&gt; <A HREF="ds_fc.html">Field Characteristics</A>,
-      <I>or</I> 
- "dde"              =&gt; not implemented,
-      <I>or</I> 
- "none"             =&gt; undef
-}
+{"macro"		=> reference to <A HREF="ds_alams.html">Active Link Macro Structure</A>,
+ or "assign_fields"	=> reference to <A HREF="ds_fas.html">Field Assign Structure</A>,
+ or "process"		=> string,
+ or "message"		=> string,
+ or "characteristics"	=> <A NAME="ds_fc.html">Field Characteristics</A>,
+ or "dde"		=> not implemented,
+ or "none"		=> undef}
 </PRE>
 
-<B>Notes</B>: The <CODE>message</CODE> member of this hash was previously 
-a string. As of ARSperl v1.50, this is no longer true.
+<P>
 
-<P>
-<HR WIDTH="30%">
-<P>
-<A HREF="toc.html"><IMG ALT="&lt;--" SRC="arrow.gif" ALIGN=CENTER> Table of Contents </A>
-<p>
-<address>
-Last changes to this page 4th August 1997 by jcmurphy@smurfland.cit.buffalo.edu<br>
-&#169; J.C.Murphy, J.W.Murphy 1997 arsperl@smurfland.cit.buffalo.edu
-</address>
+<A HREF="toc.html"><IMG ALT="&lt;--" SRC="arrow.gif" ALIGN=CENTER> Back to Table of Contents </A>
 </BODY>
 </HTML>

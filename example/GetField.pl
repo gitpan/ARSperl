@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl
 #
-# $Header: /u1/project/ARSperl/ARSperl/example/RCS/GetField.pl,v 1.2 1997/05/07 15:38:19 jcmurphy Exp jcmurphy $
+# $Header: /u1/project/ARSperl/ARSperl/example/RCS/GetField.pl,v 1.2 1997/05/07 15:38:19 jcmurphy Exp $
 #
 # EXAMPLE
 #    GetField.pl [server] [username] [password] [schema] [fieldname]
@@ -28,14 +28,6 @@
 #
 
 use ARS;
-
-%subHashes = ("displayInstanceList" => 1,
-	      "permissions" => 1,
-	      "limit" => 1,
-	      "fieldMap" => 1);
-
-%subArrays = ("dInstanceList" => 1,
-	      "commonProps" => 1);
 
 # Parse command line parameters
 
@@ -81,35 +73,6 @@ createMode: $fieldInfo->{createMode}
 dataType: $fieldInfo->{dataType}
 defaultVal: $fieldInfo->{defaultVal}
 owner: $fieldInfo->{owner}
-
 ";
 
-dumpKV($fieldInfo, 0);
-
 ars_Logoff($ctrl);
-
-
-exit 0;
-
-sub dumpKV {
-  my $hr = shift;
-  my $i = shift;
-
-  foreach $k (keys %$hr){
-      print "\t"x$i."key=<$k> val=<$hr->{$k}>\n";
-      if($subHashes{$k} == 1) {
-	dumpKV($hr->{$k}, $i+1);
-      }
-      elsif($subArrays{$k} == 1) {
-        dumpAV($hr->{k}, $i+1);
-      }
-  }
-}
-
-sub dumpAV {
-   my $ar = shift;
-   my $i = shift;
-
-   print "\t"x$i."(".join(',', @$ar).")\n";
-}
-
