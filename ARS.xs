@@ -1,8 +1,9 @@
 /*
-    ARSperl - An ARS2.0 / Perl5.0 Integration Kit
+    ARSperl - An ARS2.x / Perl5.x Integration Kit
 
-    Copyright (C) 1995 Joel Murphy, jmurphy@acsu.buffalo.edu
-                       Jeff Murphy, jcmurphy@acsu.buffalo.edu
+    Copyright (C) 1995,1996 
+	Joel Murphy, jmurphy@acsu.buffalo.edu
+        Jeff Murphy, jcmurphy@acsu.buffalo.edu
  
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -27,7 +28,11 @@
 
 #include <stdio.h>
 #include <string.h>
-#include <alloca.h>
+
+#ifdef PROFILE
+#include <sys/time.h>
+#endif
+
 #include "ar.h"
 #include "arerrno.h"
 #include "arextern.h"
@@ -41,8 +46,15 @@ typedef struct {
   void *array;
 } ARList;
 
-typedef SV* (*ARS_fn)(void *);
-/* typedef void *ARS_fn; */
+typedef struct {
+  ARControlStruct ctrl;
+  int queries;
+  long startTime;
+  long endTime;
+} ars_ctrl;
+
+/* typedef SV* (*ARS_fn)(void *); */
+typedef void *(*ARS_fn)();
 
 SV *perl_ARStatusStruct(ARStatusStruct *);
 SV *perl_ARInternalId(ARInternalId *);
@@ -60,6 +72,7 @@ SV *perl_ARActiveLinkMacroStruct(ARActiveLinkMacroStruct *);
 SV *perl_ARFieldCharacteristics(ARFieldCharacteristics *);
 SV *perl_ARDDEStruct(ARDDEStruct *);
 SV *perl_ARActiveLinkActionStruct(ARActiveLinkActionStruct *);
+SV *perl_ARFilterActionStruct(ARFilterActionStruct *);
 SV *perl_expandARCharMenuStruct(ARControlStruct *, ARCharMenuStruct *);
 SV *perl_AREntryListFieldStruct(AREntryListFieldStruct *);
 SV *perl_ARIndexStruct(ARIndexStruct *);
@@ -78,6 +91,13 @@ SV *perl_ARQueryValueStruct(ARQueryValueStruct *);
 SV *perl_ARFieldValueOrArithStruct(ARFieldValueOrArithStruct *);
 SV *perl_relOp(ARRelOpStruct *);
 HV *perl_qualifier(ARQualifierStruct *);
+int ARGetFieldCached(ARControlStruct *, ARNameType, ARInternalId,
+		     unsigned int *, unsigned int *,
+		     unsigned int *, ARValueStruct *,
+		     ARPermissionList *, ARFieldLimitStruct *,
+		     ARDisplayList *, char **, ARTimestamp *,
+		     ARNameType, ARNameType, char **,
+		     ARStatusList *);
 
 /* malloc that will never return null */
 static void *mallocnn(int s) {
@@ -98,7 +118,7 @@ int ARError(int returncode, ARStatusList status) {
   errbuf[0] = '\0';
   if (returncode==0) {
 #ifndef WASTE_MEM
-    FreeARStatusList(&status, FALSE);
+/*    FreeARStatusList(&status, FALSE); */
 #endif
     return 0;
   }
@@ -144,7 +164,7 @@ SV *perl_ARList(ARList *in, ARS_fn fn, int size) {
   int i;
   AV *array = newAV();
   for (i=0; i<in->numItems; i++)
-    av_push(array, fn((char *)in->array+(i*size)));
+    av_push(array, (*fn)((char *)in->array+(i*size)));
   return newRV((SV *)array);
 }
 
@@ -451,6 +471,64 @@ SV *perl_ARActiveLinkActionStruct(ARActiveLinkActionStruct *in) {
   return newRV((SV *)hash);
 }
 
+SV *perl_ARFilterActionNotify(ARFilterActionNotify *in) {
+  HV *hash=newHV();
+  AV *array=newAV();
+  int i;
+  hv_store(hash, "user", strlen("user"),
+ 	   newSVpv(in->user, 0), 0);
+  if(in->notifyText) 
+	hv_store(hash, "notifyText", strlen("notifyText"),
+		 newSVpv(in->notifyText, 0), 0);
+  hv_store(hash, "notifyPriority", strlen("notifyPriority"),
+	   newSViv(in->notifyPriority), 0);
+  hv_store(hash, "notifyMechanism", strlen("notifyMechanism"),
+	   newSViv(in->notifyMechanism), 0);
+  hv_store(hash, "notifyMechanismXRef", strlen("notifyMechanismXRef"),
+	   newSViv(in->notifyMechanismXRef), 0);
+  if(in->subjectText)
+	hv_store(hash, "subjectText", strlen("subjectText"),
+		 newSVpv(in->subjectText, 0), 0);
+  hv_store(hash, "fieldIdListType", strlen("fieldIdListType"),
+	   newSViv(in->fieldIdListType), 0);
+  hv_store(hash, "fieldList", strlen("fieldList"),
+           perl_ARList((ARList *)&in->fieldIdList,
+	   (ARS_fn)perl_ARInternalId,
+           sizeof(ARInternalId)), 0);
+  return newRV((SV *)hash);
+}
+
+SV *perl_ARFilterActionStruct(ARFilterActionStruct *in) {
+  HV *hash=newHV();
+  int i;
+  switch (in->action) {
+  case AR_FILTER_ACTION_NOTIFY:
+    hv_store(hash, "notify", strlen("notify"),
+	     perl_ARFilterActionNotify(&in->u.notify), 0);
+    break;
+  case AR_FILTER_ACTION_MESSAGE:
+    hv_store(hash, "message", strlen("message"),
+	     perl_ARStatusStruct(&in->u.message), 0);
+    break;
+  case AR_FILTER_ACTION_FIELDS:
+    hv_store(hash, "assign_fields", strlen("assign_fields"),
+	     perl_ARList((ARList *)&in->u.fieldList,
+			 (ARS_fn)perl_ARFieldAssignStruct,
+			 sizeof(ARFieldAssignStruct)), 0);
+    break;
+  case AR_FILTER_ACTION_PROCESS:
+    hv_store(hash, "process", strlen("process"),
+	     newSVpv(in->u.process, 0), 0);
+    break;
+  case AR_FILTER_ACTION_NONE:
+  default:
+    hv_store(hash, "none", strlen("none"),
+	     &sv_undef, 0);
+    break;
+  }
+  return newRV((SV *)hash);
+}
+
 SV *perl_expandARCharMenuStruct(ARControlStruct *c, ARCharMenuStruct *in) {
   ARCharMenuStruct menu, *which;
   int ret, i;
@@ -461,6 +539,9 @@ SV *perl_expandARCharMenuStruct(ARControlStruct *c, ARCharMenuStruct *in) {
   
   if (in->menuType != AR_CHAR_MENU_LIST) {
     ret = ARExpandCharMenu(c, in, &menu, &status);
+#ifdef PROFILE
+    ((ars_ctrl *)c)->queries++;
+#endif
     if (ARError(ret, status))
       return NULL;
     which = &menu;
@@ -1074,6 +1155,129 @@ HV *perl_qualifier(ARQualifierStruct *in) {
   return hash;
 }
 
+ARDisplayList *
+dup_DisplayList(ARDisplayList *disp) {
+  ARDisplayList *new_disp;
+  new_disp = mallocnn(sizeof(ARDisplayList));
+  new_disp->numItems = disp->numItems;
+  new_disp->displayList = mallocnn(sizeof(ARDisplayStruct)*disp->numItems);
+  memcpy(new_disp->displayList, disp->displayList,
+	  sizeof(ARDisplayStruct)*disp->numItems);
+  return new_disp;
+}
+
+int
+ARGetFieldCached(ARControlStruct *ctrl, ARNameType schema, ARInternalId id,
+		 unsigned int *dataType, unsigned int *option,
+		 unsigned int *createMode, ARValueStruct *defaultVal,
+		 ARPermissionList *perm, ARFieldLimitStruct *limit,
+		 ARDisplayList *display, char **help, ARTimestamp *timestamp,
+		 ARNameType owner, ARNameType lastChanged, char **changeDiary,
+		 ARStatusList *Status) {
+  int ret;
+  HV *cache, *server, *fields, *base;
+  SV **servers, **schema_fields, **field, **val, *display_ref;
+  unsigned int my_dataType;
+  ARDisplayList my_display, *display_copy;
+  char field_string[20];
+  
+  if (option || createMode || defaultVal || perm || limit || help ||
+	 timestamp || owner || lastChanged || changeDiary) 
+    goto cache_fail;
+  
+  /* try to do lookup in cache */
+  
+  cache = perl_get_hv("ARS::field_cache",TRUE);
+  /* dereference hash with server */
+  servers = hv_fetch(cache, ctrl->server, strlen(ctrl->server), TRUE);
+  if (! (servers && SvROK(*servers) &&
+	 SvTYPE(server = (HV *)SvRV(*servers)) == SVt_PVHV))
+    goto cache_fail;
+  /* dereference hash with schema */
+  schema_fields = hv_fetch(server, schema, strlen(schema), TRUE);
+  if (! (schema_fields && SvROK(*schema_fields) &&
+	 SvTYPE(fields = (HV *)SvRV(*schema_fields)) == SVt_PVHV))
+    goto cache_fail;
+  /* dereference with field id */
+  sprintf(field_string, "%i", id);
+  field = hv_fetch(fields, field_string, strlen(field_string), TRUE);
+  if (! (field && SvROK(*field) && SvTYPE(base = (HV *)SvRV(*field))))
+    goto cache_fail;
+  /* fetch values */
+  val = hv_fetch(base, "name", strlen("name"), FALSE);
+  if (! val) goto cache_fail;
+  if (! (val && sv_isa(*val, "ARDisplayListPtr")))
+    goto cache_fail;
+  if (display) {
+    display_copy = (ARDisplayList *)SvIV(SvRV(*val));
+    display->numItems = display_copy->numItems;
+    display->displayList =
+      mallocnn(sizeof(ARDisplayStruct)*display_copy->numItems);
+    memcpy(display->displayList, display_copy->displayList,
+	    sizeof(ARDisplayStruct)*display_copy->numItems);
+  }
+  val = hv_fetch(base, "type", strlen("type"), FALSE);
+  if (! val)
+    goto cache_fail;
+  if (dataType) {
+    *dataType = SvIV(*val);
+  }
+  return 0;
+  
+  /* we don't cache one of the arguments or we couln't find
+     field in cache */
+ cache_fail:;
+  ret = ARGetField(ctrl, schema, id, &my_dataType, option, createMode,
+		 defaultVal, perm, limit, &my_display, help, timestamp,
+		   owner, lastChanged, changeDiary, Status);
+#ifdef PROFILE
+  ((ars_ctrl *)ctrl)->queries++;
+#endif
+  if (dataType)
+    *dataType = my_dataType;
+  if (display)
+    *display = my_display;
+  if (ret == 0) {
+    /* get variable */
+    cache = perl_get_hv("ARS::field_cache",TRUE);
+    /* dereference hash with server */
+    servers = hv_fetch(cache, ctrl->server, strlen(ctrl->server), TRUE);
+    if (! servers) return ret;
+    if (! SvROK(*servers) ||
+	SvTYPE(SvRV(*servers)) != SVt_PVHV) {
+      sv_setsv(*servers, newRV((SV *)(server = newHV())));
+    } else {
+      server = (HV *)SvRV(*servers);
+    }
+    /* dereference hash with schema */
+    schema_fields = hv_fetch(server, schema, strlen(schema), TRUE);
+    if (! schema_fields) return ret;
+    if (! SvROK(*schema_fields) ||
+	SvTYPE(SvRV(*schema_fields)) != SVt_PVHV) {
+      sv_setsv(*schema_fields, newRV((SV *)(fields = newHV())));
+    } else {
+      fields = (HV *)SvRV(*schema_fields);
+    }
+    /* dereference hash with field id */
+    sprintf(field_string, "%i", id);
+    field = hv_fetch(fields, field_string, strlen(field_string), TRUE);
+    if (! field) return ret;
+    if (! SvROK(*field) ||
+	SvTYPE(SvRV(*field)) != SVt_PVHV) {
+      sv_setsv(*field, newRV((SV *)(base = newHV())));
+    } else {
+      base = (HV *)SvRV(*field);
+    }
+    /* store field attributes */
+    display_ref = newSViv(0);
+    sv_setref_pv(display_ref, "ARDisplayListPtr",
+		 (void *)dup_DisplayList(display));
+    hv_store(base, "name", strlen("name"), display_ref, 0);
+    hv_store(base, "type", strlen("type"), newSViv(my_dataType), 0);
+  }
+  return ret;
+}
+
 MODULE = ARS		PACKAGE = ARS		PREFIX = ARS
 
 int
@@ -1140,6 +1344,9 @@ ars_LoadQualifier(ctrl,schema,qualstring)
 	  ARStatusList status;
 	
 	  ret = ARLoadARQualifierStruct(ctrl, schema, NULL, qualstring, qual, &status);
+#ifdef PROFILE
+	  ((ars_ctrl *)ctrl)->queries++;
+#endif
 	  if (! ARError(ret, status)) {
 	    RETVAL = qual;
 	  } else {
@@ -1159,10 +1366,10 @@ __ars_init()
 	  int ret;
 	  ARStatusList status;
 	
-	  ret = ARInitialization(&status); /* FIX */
+	/*  ret = ARInitialization(&status);
 	  if (ARError(ret, status)) {
 	    croak("unable to initialize ARS module");
-	  }
+	  } */
 	}
 
 ARControlStruct *
@@ -1176,6 +1383,9 @@ ars_Login(server,username,password)
 	  ARStatusList status;
 	  ARServerNameList serverList;
 	  ARControlStruct *ctrl;
+#ifdef PROFILE
+	  struct timeval tv;
+#endif
 	  
 	  ret = ARGetListServer(&serverList, &status);
 	  if (ARError(ret, status)) {
@@ -1187,7 +1397,16 @@ ars_Login(server,username,password)
 	    RETVAL = NULL;
 	    goto ar_login_end;
 	  }
-	  ctrl = (ARControlStruct *)mallocnn(sizeof(ARControlStruct));
+	  ctrl = (ARControlStruct *)mallocnn(sizeof(ars_ctrl));
+	  ((ars_ctrl *)ctrl)->queries = 0;
+	  ((ars_ctrl *)ctrl)->startTime = 0;
+	  ((ars_ctrl *)ctrl)->endTime = 0;
+#ifdef PROFILE
+	  if (gettimeofday(&tv, 0) != -1)
+		((ars_ctrl *)ctrl)->startTime = tv.tv_sec;
+	  else
+		perror("gettimeofday");
+#endif
 	  ctrl->cacheId = 0;
 	  ctrl->operationTime = 0;
 	  strncpy(ctrl->user, username, sizeof(ctrl->user));
@@ -1209,6 +1428,24 @@ ars_Login(server,username,password)
 	OUTPUT:
 	RETVAL
 
+HV *
+ars_GetProfileInfo(ctrl)
+	ARControlStruct *	ctrl
+	CODE:
+	{
+	RETVAL = newHV();
+#ifdef PROFILE
+	hv_store(RETVAL, "queries", strlen("queries"),
+		 newSViv(((ars_ctrl *)ctrl)->queries), 0);
+	hv_store(RETVAL, "startTime", strlen("startTime"),
+		 newSViv(((ars_ctrl *)ctrl)->startTime), 0);
+#else /* profiling not compiled in */
+	fprintf(stderr, "arsperl: optional profiling not compiled in.\n");
+#endif
+	}
+	OUTPUT:
+	RETVAL
+
 void
 ars_Logoff(ctrl,a=0,b=0,c=1)
 	ARControlStruct *	ctrl
@@ -1220,7 +1457,6 @@ ars_Logoff(ctrl,a=0,b=0,c=1)
 	    int ret;
 	    ARStatusList status;
 	    if (!ctrl) return;
-	    /* undocumented ars call */
 	    ret = XARReleaseCurrentUser(ctrl, ctrl->user, &status, a, b, c);
 	    ARError(ret, status);
 	    /* FIX    ret = ARTermination(&status);
@@ -1239,6 +1475,9 @@ ars_GetListField(control,schema,changedsince=0)
 	  ARStatusList status;
 	  int ret, i;
 	  ret = ARGetListField(control,schema,changedsince,&idlist,&status);
+#ifdef PROFILE
+	  ((ars_ctrl *)control)->queries++;
+#endif
 	  if (!ARError(ret,status)) {
 	    for (i=0; i<idlist.numItems; i++)
 	      XPUSHs(sv_2mortal(newSViv(idlist.internalIdList[i])));
@@ -1247,6 +1486,7 @@ ars_GetListField(control,schema,changedsince=0)
 #endif
 	  }
 	}
+
 
 void
 ars_GetFieldByName(control,schema,field_name)
@@ -1261,9 +1501,12 @@ ars_GetFieldByName(control,schema,field_name)
 	  ARDisplayList displayList;
 	
 	  ret = ARGetListField(control, schema, (ARTimestamp)0, &idList, &status);
+#ifdef PROFILE
+	  ((ars_ctrl *)control)->queries++;
+#endif
 	  if (! ARError(ret, status)) {
 	    for (loop=0; loop<idList.numItems; loop++) {
-	      ret = ARGetField(control, schema, idList.internalIdList[loop], NULL, NULL, NULL, NULL, NULL, NULL, &displayList, NULL, NULL, NULL, NULL, NULL, &status);
+	      ret = ARGetFieldCached(control, schema, idList.internalIdList[loop], NULL, NULL, NULL, NULL, NULL, NULL, &displayList, NULL, NULL, NULL, NULL, NULL, &status);
 	      if (ARError(ret, status))
 	        break;
 	      if (displayList.numItems < 1) {
@@ -1299,9 +1542,12 @@ ars_GetFieldTable(control,schema)
 	  ARDisplayList displayList;
 	  
 	  ret = ARGetListField(control, schema, (ARTimestamp)0, &idList, &status);
+#ifdef PROFILE
+	  ((ars_ctrl *)control)->queries++;
+#endif
 	  if (! ARError(ret, status)) {
 	    for (loop=0; loop<idList.numItems; loop++) {
-	      ret = ARGetField(control, schema, idList.internalIdList[loop], NULL, NULL, NULL, NULL, NULL, NULL, &displayList, NULL, NULL, NULL, NULL, NULL, &status);
+	      ret = ARGetFieldCached(control, schema, idList.internalIdList[loop], NULL, NULL, NULL, NULL, NULL, NULL, &displayList, NULL, NULL, NULL, NULL, NULL, &status);
 	      if (ARError(ret, status))
 	        break;
 	      if (displayList.numItems < 1) {
@@ -1342,7 +1588,7 @@ ars_CreateEntry(ctrl,schema...)
 	    for (i=0; i<c; i++) {
 	      a = i*2+2;
 	      fieldList.fieldValueList[i].fieldId = SvIV(ST(a));
-	      ret = ARGetField(ctrl, schema, fieldList.fieldValueList[i].fieldId, &dataType, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, &status);
+	      ret = ARGetFieldCached(ctrl, schema, fieldList.fieldValueList[i].fieldId, &dataType, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, &status);
 	      if (ARError(ret, status)) {	
 		goto create_entry_end;
 	      }
@@ -1380,6 +1626,9 @@ ars_CreateEntry(ctrl,schema...)
 	      }
 	    }
 	    ret = ARCreateEntry(ctrl, schema, &fieldList, entryId, &status);
+#ifdef PROFILE
+	    ((ars_ctrl *)ctrl)->queries++;
+#endif
 	    if (! ARError(ret, status)) {
 	      RETVAL = entryId;
 	    }
@@ -1414,6 +1663,9 @@ ars_DeleteEntry(ctrl,schema,entry_id)
 	    sprintf(pad_entry+(AR_MAX_ENTRYID_SIZE-id_len), "%s", entry_id);
 	    
 	    ret = ARDeleteEntry(ctrl, schema, pad_entry, &status);
+#ifdef PROFILE
+	    ((ars_ctrl *)ctrl)->queries++;
+#endif
 	    if (ARError(ret, status))
 	      RETVAL=-1;
 	    else
@@ -1447,6 +1699,9 @@ ars_GetEntry(ctrl,schema,entry_id,...)
 	      idList.internalIdList[i] = SvIV(ST(i+3));
 	  }
 	  ret = ARGetEntry(ctrl, schema, entry_id, &idList, &fieldList, &status); 
+#ifdef PROFILE
+	  ((ars_ctrl *)ctrl)->queries++;
+#endif
 	  if (ARError(ret, status)) {
 #ifndef WASTE_MEM
 	    FreeARInternalIdList(&idList, FALSE);
@@ -1498,6 +1753,9 @@ ars_GetListEntry(ctrl,schema,qualifier,maxRetrieve,...)
 	    sortList.sortList[i].sortOrder = SvIV(ST(i*2+5));
 	  }
 	  ret = ARGetListEntry(ctrl, schema, qualifier, &sortList, maxRetrieve, &entryList, &num_matches, &status);
+#ifdef PROFILE
+	  ((ars_ctrl *)ctrl)->queries++;
+#endif
 	  if (ARError(ret, status)) {
 #ifndef WASTE_MEM
 	    FreeARSortList(&sortList,FALSE);
@@ -1525,6 +1783,9 @@ ars_GetListSchema(ctrl,changedsince=0)
 	  int i, ret;
 	  
 	  ret = ARGetListSchema(ctrl, changedsince, &nameList, &status);
+#ifdef PROFILE
+	  ((ars_ctrl *)ctrl)->queries++;
+#endif
 	  if (! ARError(ret, status)) {
 	    for (i=0; i<nameList.numItems; i++) {
 	      XPUSHs(sv_2mortal(newSVpv(nameList.nameList[i], 0)));
@@ -1579,6 +1840,9 @@ ars_GetActiveLink(ctrl,name)
 	  SV *ref;
 	  
 	  ret = ARGetActiveLink(ctrl,name,&order,schema,&groupList,&executeMask,&field,&displayList,&enable,query,&actionList,&helpText,&timestamp,owner,lastChanged,&changeDiary,&status);
+#ifdef PROFILE
+	  ((ars_ctrl *)ctrl)->queries++;
+#endif
 	  RETVAL = newHV();
 	  if (!ARError(ret,status)) {
 	    /* store name of active link */
@@ -1637,6 +1901,222 @@ ars_GetActiveLink(ctrl,name)
 	OUTPUT:
 	RETVAL
 
+HV *
+ars_GetFilter(ctrl,name)
+	ARControlStruct *	ctrl
+	char *			name
+	CODE:
+	{
+	  int ret;
+	  unsigned int order;
+	  unsigned int opSet;
+	  ARNameType schema;
+	  unsigned int enable;
+	  char *helpText;
+	  char *changeDiary;
+	  ARQualifierStruct *query=mallocnn(sizeof(ARQualifierStruct));
+	  ARFilterActionList actionList;
+	  ARTimestamp timestamp;
+	  ARNameType owner;
+	  ARNameType lastChanged;
+	  ARStatusList status;
+	  SV *ref;
+	  
+	  ret = ARGetFilter(ctrl, name, &order, schema, &opSet, &enable, 
+			    query, &actionList, &helpText, &timestamp, 
+			    owner, lastChanged, &changeDiary, &status);
+#ifdef PROFILE
+	  ((ars_ctrl *)ctrl)->queries++;
+#endif
+	  RETVAL = newHV();
+	  if (!ARError(ret,status)) {
+	    hv_store(RETVAL, "name", strlen("name"),
+		     newSVpv(name, 0), 0);
+	    hv_store(RETVAL, "order", strlen("order"),
+		     newSViv(order), 0);
+	    hv_store(RETVAL, "schema", strlen("schema"),
+		     newSVpv(schema, 0), 0);
+	    hv_store(RETVAL, "opSet", strlen("opSet"),
+	 	     newSViv(opSet), 0);
+	    hv_store(RETVAL, "enable", strlen("enable"),
+		     newSViv(enable), 0);
+	    /* a bit of a hack -- makes blessed reference to qualifier */
+	    ref = newSViv(0);
+	    sv_setref_pv(ref, "ARQualifierStructPtr", (void *)query);
+	    hv_store(RETVAL, "query", strlen("query"), ref, 0);
+	    hv_store(RETVAL, "actionList", strlen("actionList"),
+		     perl_ARList((ARList *)&actionList,
+				 (ARS_fn)perl_ARFilterActionStruct,
+				 sizeof(ARFilterActionStruct)), 0);
+	    if(helpText)
+		hv_store(RETVAL, "helpText", strlen("helpText"),
+			 newSVpv(helpText, 0), 0);
+	    hv_store(RETVAL, "timestamp", strlen("timestamp"),
+		     newSViv(timestamp), 0);
+	    hv_store(RETVAL, "owner", strlen("owner"),
+		     newSVpv(owner, 0), 0);
+	    hv_store(RETVAL, "lastChanged", strlen("lastChanged"),
+		     newSVpv(lastChanged, 0), 0);
+	    if(changeDiary) 
+		hv_store(RETVAL, "changeDiary", strlen("changeDiary"),
+			newSVpv(changeDiary, 0), 0);
+#ifndef WASTE_MEM
+	    FreeARFilterActionList(&actionList,FALSE);
+	    if(helpText)
+	      free(helpText);
+	    if(changeDiary)
+	      free(changeDiary);
+#endif
+	  }
+	}
+	OUTPUT:
+	RETVAL
+
+void
+ars_GetServerStatistics(ctrl,...)
+	ARControlStruct *	ctrl
+	PPCODE:
+	{
+	  ARServerInfoRequestList requestList;
+	  ARServerInfoList serverInfo;
+	  int i, ret;
+	  ARStatusList status;
+
+	  if(items < 1) {
+		ars_errstr = "invalid number of arguments";
+	  } else {
+		requestList.numItems = items - 1;
+		requestList.requestList = mallocnn(sizeof(unsigned int) * (items-1));
+		if(requestList.requestList) {
+			for(i=1; i<items; i++) {
+				requestList.requestList[i-1] = SvIV(ST(i));
+			}
+			ret = ARGetServerStatistics(ctrl, &requestList, &serverInfo, &status);
+#ifdef PROFILE
+			((ars_ctrl *)ctrl)->queries++;
+#endif
+			if(ARError(ret, status)) {
+#ifndef WASTE_MEM
+				free(requestList.requestList);
+#endif
+			} else {
+				for(i=0; i<serverInfo.numItems; i++) {
+					XPUSHs(sv_2mortal(newSViv(serverInfo.serverInfoList[i].operation)));
+					switch(serverInfo.serverInfoList[i].value.dataType) {
+					case AR_DATA_TYPE_ENUM:
+					case AR_DATA_TYPE_TIME:
+					case AR_DATA_TYPE_BITMASK:
+					case AR_DATA_TYPE_INTEGER:
+						XPUSHs(sv_2mortal(newSViv(serverInfo.serverInfoList[i].value.u.intVal)));
+						break;
+					case AR_DATA_TYPE_REAL:
+						XPUSHs(sv_2mortal(newSVnv(serverInfo.serverInfoList[i].value.u.realVal)));
+						break;
+					case AR_DATA_TYPE_CHAR:
+						XPUSHs(sv_2mortal(newSVpv(serverInfo.serverInfoList[i].value.u.charVal,
+							strlen(serverInfo.serverInfoList[i].value.u.charVal))));
+						break;
+					}
+				}
+#ifndef WASTE_MEM
+				FreeARServerInfoList(serverInfo, FALSE);
+				free(requestList.requestList);
+#endif
+			}
+		} else {
+			ars_errstr = "mallocnn failed to allocated space";
+		}
+	  }
+	}
+
+HV *
+ars_GetCharMenu(ctrl,name)
+	ARControlStruct *	ctrl
+	char *			name
+	CODE:
+	{
+	  unsigned int       refreshCode;
+	  ARCharMenuStruct   menuDefn;
+	  char	            *helpText;
+	  ARTimestamp	     timestamp;
+	  ARNameType	     owner;
+	  ARNameType	     lastChanged;
+	  char		    *changeDiary;
+	  ARStatusList	     status;
+	  int                ret, i;
+	  HV		    *menuDef = newHV();
+	  SV		    *ref;
+
+	  RETVAL = newHV();
+	  ret = ARGetCharMenu(ctrl, name, &refreshCode, &menuDefn, &helpText, &timestamp, owner, lastChanged, &changeDiary, &status);
+#ifdef PROFILE
+	  ((ars_ctrl *)ctrl)->queries++;
+#endif
+	  if(!ARError(ret, status)) {
+		hv_store(RETVAL, "name", strlen("name"),
+				newSVpv(name, 0), 0);
+		if(helpText)
+			hv_store(RETVAL, "helpText", strlen("helpText"),
+				newSVpv(helpText,0), 0);
+		hv_store(RETVAL, "timestamp", strlen("timestamp"),
+			newSViv(timestamp), 0);
+		hv_store(RETVAL, "owner", strlen("owner"),
+			newSVpv(owner, 0), 0);
+		hv_store(RETVAL, "lastChanged", strlen("lastChanged"),
+			newSVpv(lastChanged, 0), 0);
+		if(changeDiary)
+			hv_store(RETVAL, "changeDiary", strlen("changeDiary"),
+				newSVpv(changeDiary, 0), 0);
+		hv_store(RETVAL, "menuType", strlen("menuType"),
+			newSViv(menuDefn.menuType), 0);
+		switch(menuDefn.menuType) {
+		case AR_CHAR_MENU_QUERY:
+			hv_store(menuDef, "schema", strlen("schema"),
+				newSVpv(menuDefn.u.menuQuery.schema, 0), 0);
+			hv_store(menuDef, "server", strlen("server"),
+				newSVpv(menuDefn.u.menuQuery.server, 0), 0);
+			hv_store(menuDef, "labelField", strlen("labelField"),
+				newSViv(menuDefn.u.menuQuery.labelField), 0);
+			hv_store(menuDef, "valueField", strlen("valueField"),
+				newSViv(menuDefn.u.menuQuery.valueField), 0);
+			hv_store(menuDef, "sortOnLabel", strlen("sortOnLabel"),
+				newSViv(menuDefn.u.menuQuery.sortOnLabel), 0);
+			ref = newSViv(0);
+			sv_setref_pv(ref, "ARQualifierStructPtr", (void *)&(menuDefn.u.menuQuery.qualifier));
+			hv_store(RETVAL, "qualifier", strlen("qualifier"), ref, 0);
+			hv_store(RETVAL, "menuQuery", strlen("menuQuery"),
+				newRV((SV *)menuDef), 0);
+			break;
+		case AR_CHAR_MENU_FILE:
+			hv_store(menuDef, "fileLocation", strlen("fileLocation"),
+				newSViv(menuDefn.u.menuFile.fileLocation), 0);
+			hv_store(menuDef, "filename", strlen("filename"),
+				newSVpv(menuDefn.u.menuFile.filename, 0), 0);
+			hv_store(RETVAL, "menuFile", strlen("menuFile"),
+				newRV((SV *)menuDef), 0);
+			break;
+		case AR_CHAR_MENU_SQL:
+			hv_store(menuDef, "server", strlen("server"),
+				newSVpv(menuDefn.u.menuSQL.server, 0), 0);
+			hv_store(menuDef, "sqlCommand", strlen("sqlCommand"),
+				newSVpv(menuDefn.u.menuSQL.sqlCommand, 0), 0);
+			hv_store(menuDef, "labelIndex", strlen("labelIndex"),
+				newSViv(menuDefn.u.menuSQL.labelIndex), 0);
+			hv_store(menuDef, "valueIndex", strlen("valueIndex"),
+				newSViv(menuDefn.u.menuSQL.valueIndex), 0);
+			hv_store(RETVAL, "menuSQL", strlen("menuSQL"),
+				newRV((SV *)menuDef), 0);
+			break;
+		}
+#ifndef WASTE_MEM
+		FreeARCharMenuStruct(&menuDefn, FALSE);
+		if(helpText) free(helpText);
+#endif
+	  }
+	}
+	OUTPUT:
+	RETVAL
+
 void
 ars_GetCharMenuItems(ctrl,name)
 	ARControlStruct *	ctrl
@@ -1649,6 +2129,9 @@ ars_GetCharMenuItems(ctrl,name)
 	  int ret, i;
 	  
 	  ret = ARGetCharMenu(ctrl, name, NULL, &menuDefn, NULL, NULL, NULL, NULL, NULL, &status);
+#ifdef PROFILE
+	  ((ars_ctrl *)ctrl)->queries++;
+#endif
 	  if (! ARError(ret,status)) {
 	    ST(0) = sv_2mortal(perl_expandARCharMenuStruct(ctrl, &menuDefn));
 #ifndef WASTE_MEM
@@ -1679,6 +2162,9 @@ ars_GetSchema(ctrl,name)
 	  
 	  RETVAL = newHV();
 	  ret = ARGetSchema(ctrl, name, &groupList, &adminGroupList, &getListFields, &indexList, &helpText, &timestamp, owner, lastChanged, &changeDiary, &status);
+#ifdef PROFILE
+	  ((ars_ctrl *)ctrl)->queries++;
+#endif
 	  if (!ARError(ret,status)) {
 	    hv_store(RETVAL, "groupList", strlen("groupList"),
 		     perl_ARList((ARList *)&groupList, 
@@ -1735,6 +2221,9 @@ ars_GetListActiveLink(ctrl,schema=NULL,changedSince=0)
 	  int ret, i;
 	  
 	  ret=ARGetListActiveLink(ctrl,schema,changedSince,&nameList,&status);
+#ifdef PROFILE
+	  ((ars_ctrl *)ctrl)->queries++;
+#endif
 	  if (! ARError(ret,status)) {
 	    for (i=0; i<nameList.numItems; i++)
 	      XPUSHs(sv_2mortal(newSVpv(nameList.nameList[i],0)));
@@ -1765,7 +2254,7 @@ ars_GetField(ctrl,schema,id)
 	  char *changeDiary;
 	  
 	  RETVAL = newHV();
-	  ret = ARGetField(ctrl, schema, id, &dataType, &option, &createMode, &defaultVal, NULL /* &permissions */, &limit, &displayList, &helpText, &timestamp, owner, lastChanged, &changeDiary, &Status);
+	  ret = ARGetFieldCached(ctrl, schema, id, &dataType, &option, &createMode, &defaultVal, NULL /* &permissions */, &limit, &displayList, &helpText, &timestamp, owner, lastChanged, &changeDiary, &Status);
 	  if (! ARError(ret, Status)) {
 	    /* store field id for convenience */
 	    hv_store(RETVAL, "fieldId", strlen("fieldId"),
@@ -1839,44 +2328,56 @@ ars_SetEntry(ctrl,schema,entry_id,getTime,...)
 	    for (i=0; i<c; i++) {
 	      a = i*2+4;
 	      fieldList.fieldValueList[i].fieldId = SvIV(ST(a));
-	      ret = ARGetField(ctrl, schema, fieldList.fieldValueList[i].fieldId, &dataType, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, &status);
-	      if (ARError(ret, status)) {	
-		goto set_entry_end;
-	      }
-	      fieldList.fieldValueList[i].value.dataType = dataType;
-	      switch (dataType) {
-	      case AR_DATA_TYPE_NULL:
-		break;
-	      case AR_DATA_TYPE_KEYWORD:
-		fieldList.fieldValueList[i].value.u.keyNum = SvIV(ST(a+1));
-		break;
-	      case AR_DATA_TYPE_INTEGER:
-		fieldList.fieldValueList[i].value.u.intVal = SvIV(ST(a+1));
-		break;
-	      case AR_DATA_TYPE_REAL:
-		fieldList.fieldValueList[i].value.u.realVal = SvNV(ST(a+1));
-		break;
-	      case AR_DATA_TYPE_CHAR:
-		fieldList.fieldValueList[i].value.u.charVal = SvPV(ST(a+1),na);
-		break;
-	      case AR_DATA_TYPE_DIARY:
-		fieldList.fieldValueList[i].value.u.diaryVal = SvPV(ST(a+1),na);
-		break;
-	      case AR_DATA_TYPE_ENUM:
-		fieldList.fieldValueList[i].value.u.enumVal = SvIV(ST(a+1));
-		break;
-	      case AR_DATA_TYPE_TIME:
-		fieldList.fieldValueList[i].value.u.timeVal = SvIV(ST(a+1));
-		break;
-	      case AR_DATA_TYPE_BITMASK:
-		fieldList.fieldValueList[i].value.u.maskVal = SvIV(ST(a+1));
-		break;
-	      default:
-		ars_errstr = "unknown field type!";
-		goto set_entry_end;
+	      
+	      if (! SvOK(ST(a+1))) {
+		/* pass a NULL */
+		fieldList.fieldValueList[i].value.dataType = AR_DATA_TYPE_NULL;
+	/*	printf("undef,"); */
+	      } else {
+	/*	printf("%s,",SvPV(ST(a+1),na)); */
+		/* determine data type and pass value */
+		ret = ARGetFieldCached(ctrl, schema, fieldList.fieldValueList[i].fieldId, &dataType, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, &status);
+		if (ARError(ret, status)) {
+		  goto set_entry_end;
+		}
+		fieldList.fieldValueList[i].value.dataType = dataType;
+		switch (dataType) {
+		case AR_DATA_TYPE_NULL:
+		  break;
+		case AR_DATA_TYPE_KEYWORD:
+		  fieldList.fieldValueList[i].value.u.keyNum = SvIV(ST(a+1));
+		  break;
+		case AR_DATA_TYPE_INTEGER:
+		  fieldList.fieldValueList[i].value.u.intVal = SvIV(ST(a+1));
+		  break;
+		case AR_DATA_TYPE_REAL:
+		  fieldList.fieldValueList[i].value.u.realVal = SvNV(ST(a+1));
+		  break;
+		case AR_DATA_TYPE_CHAR:
+		  fieldList.fieldValueList[i].value.u.charVal = SvPV(ST(a+1),na);
+		  break;
+		case AR_DATA_TYPE_DIARY:
+		  fieldList.fieldValueList[i].value.u.diaryVal = SvPV(ST(a+1),na);
+		  break;
+		case AR_DATA_TYPE_ENUM:
+		  fieldList.fieldValueList[i].value.u.enumVal = SvIV(ST(a+1));
+		  break;
+		case AR_DATA_TYPE_TIME:
+		  fieldList.fieldValueList[i].value.u.timeVal = SvIV(ST(a+1));
+		  break;
+		case AR_DATA_TYPE_BITMASK:
+		  fieldList.fieldValueList[i].value.u.maskVal = SvIV(ST(a+1));
+		  break;
+		default:
+		  ars_errstr = "unknown field type!";
+		  goto set_entry_end;
+		}
 	      }
 	    }
 	    ret = ARSetEntry(ctrl, schema, entry_id, &fieldList, getTime, &status);
+#ifdef PROFILE
+	    ((ars_ctrl *)ctrl)->queries++;
+#endif
 	    if (! ARError(ret, status)) {
 	      RETVAL = 1;
 	    }
@@ -1889,18 +2390,17 @@ ars_SetEntry(ctrl,schema,entry_id,getTime,...)
 	OUTPUT:
 	RETVAL
 
-char *
+void
 ars_Export(ctrl,displayTag,...)
 	ARControlStruct *	ctrl
 	char *			displayTag
-	CODE:
+	PPCODE:
 	{
 	  int ret, i, a, c = (items - 2) / 2;
 	  ARStructItemList structItems;
 	  char *buf, *buf_copy;
 	  ARStatusList status;
 	  
-	  RETVAL = "";
 	  if (items % 2 || c < 1) {
 	    ars_errstr = "Invalid number of arguments";
 	  } else {
@@ -1937,21 +2437,88 @@ ars_Export(ctrl,displayTag,...)
 	      structItems.structItemList[i].name[sizeof(ARNameType)-1] = '\0';
 	    }
 	    ret = ARExport(ctrl, &structItems, displayTag, &buf, &status);
+#ifdef PROFILE
+	    ((ars_ctrl *)ctrl)->queries++;
+#endif
 	    if (ARError(ret, status)) {
 #ifndef WASTE_MEM
 	      free(structItems.structItemList);
 #endif
 	      goto export_end;
 	    }
-	    /* copy buffer from heap to stack frame and free buffer */
-	    buf_copy = alloca(strlen(buf) + 1);
-	    strcpy(buf_copy, buf);
+	    XPUSHs(newSVpv(buf,0));
 #ifndef WASTE_MEM
 	    free(buf);
 #endif
-	    RETVAL = buf_copy;
 	  }
 	export_end:;
+	}
+
+int
+ars_Import(ctrl,importBuf,...)
+	ARControlStruct *	ctrl
+	char *			importBuf
+	CODE:
+	{
+	  int ret = 1, i, a, c = (items - 2) / 2;
+	  ARStructItemList *structItems = NULL;
+	  ARStatusList status;
+	  
+	  if (items % 2) {
+	    ars_errstr = "Invalid number of arguments";
+	  } else {
+	    if (c > 0) {
+	      structItems = mallocnn(sizeof(ARStructItemList));
+	      structItems->numItems = c;
+	      structItems->structItemList = mallocnn(sizeof(ARStructItemStruct)*c);
+	      for (i=0; i<c; i++) {
+		a = i*2+2;
+		if (strcmp(SvPV(ST(a),na),"Schema")==0)
+		  structItems->structItemList[i].type=AR_STRUCT_ITEM_SCHEMA;
+		else if (strcmp(SvPV(ST(a),na),"Schema_Defn")==0)
+		  structItems->structItemList[i].type=AR_STRUCT_ITEM_SCHEMA_DEFN;
+		else if (strcmp(SvPV(ST(a),na),"Schema_View")==0)
+		  structItems->structItemList[i].type=AR_STRUCT_ITEM_SCHEMA_VIEW;
+		else if (strcmp(SvPV(ST(a),na),"Schema_Mail")==0)
+		  structItems->structItemList[i].type=AR_STRUCT_ITEM_SCHEMA_MAIL;
+		else if (strcmp(SvPV(ST(a),na),"Filter")==0)
+		  structItems->structItemList[i].type=AR_STRUCT_ITEM_FILTER;
+		else if (strcmp(SvPV(ST(a),na),"Active_Link")==0)
+		  structItems->structItemList[i].type=AR_STRUCT_ITEM_ACTIVE_LINK;
+		else if (strcmp(SvPV(ST(a),na),"Admin_Ext")==0)
+		  structItems->structItemList[i].type=AR_STRUCT_ITEM_ADMIN_EXT;
+		else if (strcmp(SvPV(ST(a),na),"Char_Menu")==0)
+		  structItems->structItemList[i].type=AR_STRUCT_ITEM_CHAR_MENU;
+		else if (strcmp(SvPV(ST(a),na),"Escalation")==0)
+		  structItems->structItemList[i].type=AR_STRUCT_ITEM_ESCALATION;
+		else {
+		  ars_errstr = "Unknown import type";
+#ifndef WASTE_MEM
+		  free(structItems->structItemList);
+		  free(structItems);
+#endif
+		  goto export_end;
+		}
+		strncpy(structItems->structItemList[i].name,SvPV(ST(a+1),na), sizeof(ARNameType));
+		structItems->structItemList[i].name[sizeof(ARNameType)-1] = '\0';
+	      }
+	    }
+	    ret = ARImport(ctrl, structItems, importBuf, &status);
+#ifdef PROFILE
+	    ((ars_ctrl *)ctrl)->queries++;
+#endif
+	    if (ARError(ret, status)) {
+#ifndef WASTE_MEM
+	      if (structItems) {
+		free(structItems->structItemList);
+		free(structItems);
+	      }
+#endif
+	      goto export_end;
+	    }
+	  }
+	export_end:;
+	  RETVAL = ! ret;
 	}
 	OUTPUT:
 	RETVAL
@@ -1967,6 +2534,9 @@ ars_GetListFilter(control,schema=NULL,changedsince=0)
 	  ARStatusList status;
 	  int ret, i;
 	  ret = ARGetListFilter(control,schema,changedsince,&nameList,&status);
+#ifdef PROFILE
+	  ((ars_ctrl *)control)->queries++;
+#endif
 	  if (!ARError(ret,status)) {
 	    for (i=0; i<nameList.numItems; i++)
 	      XPUSHs(sv_2mortal(newSVpv(nameList.nameList[i], 0)));
@@ -1987,6 +2557,9 @@ ars_GetListEscalation(control,schema=NULL,changedsince=0)
 	  ARStatusList status;
 	  int ret, i;
 	  ret = ARGetListEscalation(control,schema,changedsince,&nameList,&status);
+#ifdef PROFILE
+	  ((ars_ctrl *)control)->queries++;
+#endif
 	  if (!ARError(ret,status)) {
 	    for (i=0; i<nameList.numItems; i++)
 	      XPUSHs(sv_2mortal(newSVpv(nameList.nameList[i], 0)));
@@ -2006,6 +2579,10 @@ ars_GetListCharMenu(control,changedsince=0)
 	  ARStatusList status;
 	  int ret, i;
 	  ret = ARGetListCharMenu(control,changedsince,&nameList,&status);
+#ifdef PROFILE
+	  ((ars_ctrl *)control)->queries++;
+#endif
+
 	  if (!ARError(ret,status)) {
 	    for (i=0; i<nameList.numItems; i++)
 	      XPUSHs(sv_2mortal(newSVpv(nameList.nameList[i], 0)));
@@ -2026,6 +2603,9 @@ ars_GetListAdminExtension(control,changedsince=0)
 	  ARStatusList status;
 	  int ret, i;
 	  ret = ARGetListAdminExtension(control,changedsince,&nameList,&status);
+#ifdef PROFILE
+	  ((ars_ctrl *)control)->queries++;
+#endif
 	  if (!ARError(ret,status)) {
 	    for (i=0; i<nameList.numItems; i++)
 	      XPUSHs(sv_2mortal(newSVpv(nameList.nameList[i], 0)));

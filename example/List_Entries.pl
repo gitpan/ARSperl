@@ -1,5 +1,7 @@
 #!/usr/local/bin/perl
 #
+# $Header: /u1/project/ARSperl/ARSperl/example/RCS/List_Entries.pl,v 1.1 1996/11/21 20:13:54 jcmurphy Exp $
+#
 # EXAMPLE
 #    List_Entries.pl
 #
@@ -18,6 +20,12 @@
 #    jeff murphy
 #
 # 01/12/96
+#
+# $Log: List_Entries.pl,v $
+# Revision 1.1  1996/11/21 20:13:54  jcmurphy
+# Initial revision
+#
+#
 
 use ARS;
 

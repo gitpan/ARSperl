@@ -1,5 +1,7 @@
 #!/usr/local/bin/perl
 #
+# $Header: /u1/project/ARSperl/ARSperl/example/RCS/Dump_Users.pl,v 1.1 1996/11/21 20:13:51 jcmurphy Exp $
+#
 # EXAMPLE
 #    Dump_Users.pl
 #
@@ -15,6 +17,12 @@
 #    jeff murphy
 #
 # 01/12/96
+#
+# $Log: Dump_Users.pl,v $
+# Revision 1.1  1996/11/21 20:13:51  jcmurphy
+# Initial revision
+#
+#
 
 use ARS;
 
@@ -67,4 +75,14 @@ foreach $entry_id (sort keys %entries) {
 
 # Log out of the server.
 
+$profile = ars_GetProfileInfo($ctrl);
+
 ars_Logoff($ctrl);
+
+$endTime = time();
+print "startTime = ".localtime($profile->{startTime})."\n";
+print "endTime   = ".localtime(time())."\n";
+print "run time  = ".($endTime - $profile->{startTime})." (secs)\n";
+print "queries   = ".$profile->{queries}."\n";
+print "rate      = ".($profile->{queries}/($endTime-$profile->{startTime}))." Q/S\n";
+

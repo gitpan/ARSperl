@@ -1,5 +1,7 @@
 #!/utiloss/bin/perl5.002
 #
+# $Header: /u1/project/ARSperl/ARSperl/WWW/RCS/ars_web_serv,v 1.1 1996/11/21 19:58:24 jcmurphy Exp $
+#
 #    ars_web_serv - A Web Client for ARS2.0
 #
 #    Copyright (C) 1995 Joel Murphy, jmurphy@acsu.buffalo.edu
@@ -20,6 +22,12 @@
 #    Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 # 
 #    Comments to: arsperl@smurfland.cit.buffalo.edu
+#
+# $Log: ars_web_serv,v $
+# Revision 1.1  1996/11/21 19:58:24  jcmurphy
+# Initial revision
+#
+#
 
 use Socket;
 use FileHandle;

@@ -1,5 +1,7 @@
 #!/usr/local/bin/perl
 #
+# $Header: /u1/project/ARSperl/ARSperl/example/RCS/Show_ALink.pl,v 1.1 1996/11/21 20:13:55 jcmurphy Exp $
+#
 # EXAMPLE
 #    Show_ALink.pl
 #
@@ -21,6 +23,12 @@
 #    jeff murphy
 #
 # 01/12/96
+# 
+# $Log: Show_ALink.pl,v $
+# Revision 1.1  1996/11/21 20:13:55  jcmurphy
+# Initial revision
+#
+#
 
 use ARS;
 

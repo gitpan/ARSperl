@@ -1,5 +1,7 @@
 #!/usr/local/bin/perl
 #
+# $Header: /u1/project/ARSperl/ARSperl/example/RCS/Get_Diary.pl,v 1.1 1996/11/21 20:13:54 jcmurphy Exp $
+#
 # EXAMPLE
 #    Get_Diary.pl
 #
@@ -11,6 +13,12 @@
 #    jeff murphy
 #
 # 03/06/96
+# 
+# $Log: Get_Diary.pl,v $
+# Revision 1.1  1996/11/21 20:13:54  jcmurphy
+# Initial revision
+#
+#
 
 use ARS;
 
