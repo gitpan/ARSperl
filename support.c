@@ -1484,7 +1484,7 @@ perl_ARSQLStruct(ARControlStruct * ctrl, ARSQLStruct * in)
 }
 #endif
 
-#if AR_EXPORT_VERSION >= 4
+#if AR_EXPORT_VERSION >= 3
 SV             *
 perl_ARAssignSQLStruct(ARControlStruct * ctrl, ARAssignSQLStruct * in)
 {

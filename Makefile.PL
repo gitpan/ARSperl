@@ -40,7 +40,7 @@ $debug = 0;
 # STEP 1 -> Set the path to your ARS API directory
 
 $ARSAPI     = "/usr/ars/api";
-#$ARSAPI     = "/u1/project/ARSperl/api/sol2/api4.0";
+$ARSAPI     = "/u1/project/ARSperl/api/sol2/api3.2";
 #$ARSAPI     = "/u1/project/ARSperl/api/linux/4.0";
 
 # STEP 2 -> Choose your version of ARS
