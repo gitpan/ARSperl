@@ -1,3 +1,6 @@
+ARStatusStruct :
+                  char         *appendedText;
+
 
 ARSperl todo list:
 

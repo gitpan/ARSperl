@@ -26,22 +26,34 @@
 
 use ExtUtils::MakeMaker;
 
-# There are THREE (3) steps to complete. Complete them all.
+
+
+#            There are THREE (3) steps to complete. Complete them all.
+
+
 
 
 # STEP 1 -> Set the path to your ARS API directory
 
-$ARSAPI     = "/usr/ars/api";
-#$ARSAPI     = "/u1/project/ARSperl/api/sol2/api2.1";
-$ARS_LDPATH = "-L$ARSAPI/lib";
-$INCLUDES   = "-I$ARSAPI/include";
+$ARSAPI     = "/usr/ar/api";
+#$ARSAPI     = "/u1/project/ARSperl/api/sol2/api3.2";
 
 # STEP 2 -> Choose your version of ARS
 
+#    4.0 libraries
+#        Windows NT: remove "-lpthread"
+$ARS_LIBS = "-lar -lnsl -lnts -lpthread";
 #    3.0 libraries:
-$ARS_LIBS = "-lar -lnsl -lnts";
+#$ARS_LIBS = "-lar -lnsl -lnts";
 #    2.x libraries:
 #$ARS_LIBS = "-lar -lnsl -lnts -lntc";
+
+
+push(@extras, CAPI => 'TRUE') if ($] >= 5.005 and $^O eq 'MSWin32'
+				  and $Config{archname} =~ /-object\b/i);
+
+$ARS_LDPATH = "-L$ARSAPI/lib";
+$INCLUDES   = "-I$ARSAPI/include";
 
 GenerateSupportDotH("support-h.template", $INCLUDES);
 
@@ -51,6 +63,7 @@ WriteMakefile(
 	      'LIBS'	=> ["${ARS_LDPATH} ${ARS_LIBS}"],
 	      'OBJECT'  => q[ARS$(OBJ_EXT) support$(OBJ_EXT) supportrev$(OBJ_EXT)],
 	      'INC'	=> "${INCLUDES}",
+	      @extras,
 
 # STEP 3 -> DEFINE OPTIONS:
 #
@@ -70,6 +83,7 @@ WriteMakefile(
 #
 #       Enable query profiling code (very little overhead).
 #       See ars_GetProfileInfo() call for details.
+#       Don't use this if you are compiling on _WIN32
 #
 #    -DARS20
 #
@@ -83,7 +97,8 @@ WriteMakefile(
 #
 #    -D_WIN32
 #
-#       If you are compiling ARSperl until windows, define this.
+#       If you are compiling ARSperl until windows, define this
+#       and /don't/ define PROFILE.
 #
 #    -DSKIP_SV_ISA
 #
@@ -91,6 +106,7 @@ WriteMakefile(
 #       "undefined symbol: sv_isa" then add this define.
 
 	      'DEFINE'	=> '-DPROFILE ',
+#             'DEFINE'  => '-D_WIN32 ', # note: win32 -> no -DPROFILE
 #
 # if you have trouble under solaris when linking (bfd assertion 
 # failures) try uncommenting the following:

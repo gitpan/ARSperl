@@ -1,4 +1,4 @@
-$Header: /u1/project/ARSperl/ARSperl/RCS/CHANGES,v 1.25 1998/09/18 14:42:50 jcmurphy Exp $
+$Header: /u1/project/ARSperl/ARSperl/RCS/CHANGES,v 1.28 1999/01/04 21:08:20 jcmurphy Exp $
 
 CHANGES for ARSperl
 
@@ -13,6 +13,38 @@ previous versions of arsperl and may require altering of some arsperl
 scripts.
 
 MM/DD/YY
+=======================================================================
+#######################################################################
+=======================================================================
+01/04/99        (1.63)
+
+  o (JCM)  fixed some missing conditional compilation #if's in code
+  o (JCM)  changes "require Config" to "use Config" in Makefile.PL
+           at the request of activestate
+  o (JCM)  added MANIFEST file to distribution
+
+=======================================================================
+#######################################################################
+=======================================================================
+12/28/98        (1.62)
+
+  o (JCM)  added extra decoding code to GetFilter.pl example script
+  o (JCM)  syntax errors fixed in some example scripts
+  o (JCM)  added bug fix to NTRegisterServer from  G David Frye <gdf@uiuc.edu>
+  o (JCM)  ars4.0 integration (see RELNOTES for important compatibility
+           information)
+  o (JCM)  perl_qualifier now takes a control struct 
+  o (JCM)  if compiled against API>=4.0 then __ars_init __ars_term
+           no longer do anything (but are still there). the functionality
+           of each of these have been rolled into ars_Login and ars_Logoff
+           respectively.
+  o (JCM)  added ars_APIVersion() 
+  o (JCM)  GetActiveLink, when compiled against 4.0 returns ARMessageStruct
+  o (JCM)  applied some changes contributed by Murray Nesbitt 
+           <murray@ActiveState.com> so that it will compile against the
+           active state version of perl more easily. 
+  o (JCM)  changed licensing to match that of perl itself.
+
 =======================================================================
 #######################################################################
 =======================================================================

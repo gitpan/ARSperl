@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl
 #
-# $Header: /u1/project/ARSperl/ARSperl/example/RCS/PrintQual.pl,v 1.1 1997/02/20 19:33:02 jcmurphy Exp $
+# $Header: /u1/project/ARSperl/ARSperl/example/RCS/PrintQual.pl,v 1.1 1997/02/20 19:33:02 jcmurphy Exp jcmurphy $
 #
 # EXAMPLE
 #    PrintQual.pl
@@ -63,7 +63,7 @@ if(!defined($password)) {
 
 # Decode the encoded structure
 
-($dq = ars_perl_qualifier($q)) ||
+($dq = ars_perl_qualifier($ctrl, $q)) ||
     die "ars_perl_qualifier failed: $ars_errstr\n";
 
 # Convert the decoded structure to a readable format
