@@ -1,6 +1,4 @@
-ARStatusStruct :
-                  char         *appendedText;
-
+Container Calls
 
 ARSperl todo list:
 
@@ -8,6 +6,8 @@ ARSperl todo list:
 	decode DDE
 
   o implement remaining functions:
+
+ars_GetListContainer
 
 ARCreateCharMenu
 ARCreateEscalation
@@ -48,3 +48,28 @@ ARSetVUI
    o status history conversion?
    o allow for either/or enumer text or enum value in set/create
    o if unknown param, error
+
+
+Also, ARSperl upto 1.66 does not return the unsigned integer "Schema
+Type" in a call to ars_GetSchema.  Could "Schema Type" be returned in
+the next release of ARSperl please? 
+
+
+
+Howdy everyone:
+  Please forgive me if this question is a bit naive, I'm still new to the
+universe of Remedy and such ... 
+
+I'm looking for a perl library which could take standard ARS/Remedy style
+query and return the query in Sybase Transact SQL format. Something like
+this:
+     @SYBASE_SQL = get_SybaseSQL($ARS_QUERY);
+where:
+   $ARS_QUERY = "'Field' = \"$value\" ...etc"
+and:
+   @SYBASE_QUERY would be something like this:
+   select Ticket_No from Schema_Name
+   WHERE Field = '$value'
+
+
+

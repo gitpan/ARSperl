@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl
 #
-# $Header: /cvs/ARSperl/Makefile.PL,v 1.8 1999/10/03 04:00:27 jcmurphy Exp $
+# $Header: /cvs/ARSperl/Makefile.PL,v 1.15 2000/07/04 14:44:22 jcmurphy Exp $
 #
 # ARSperl Makefile
 #
@@ -13,6 +13,29 @@
 #    run with "perl Makefile.PL" then type "make"
 #
 # $Log: Makefile.PL,v $
+# Revision 1.15  2000/07/04 14:44:22  jcmurphy
+# *** empty log message ***
+#
+# Revision 1.14  2000/06/01 16:54:03  jcmurphy
+# *** empty log message ***
+#
+# Revision 1.13  2000/05/24 18:05:25  jcmurphy
+# primary ars4.5 integration in this checkpoint.
+#
+# Revision 1.12  2000/04/05 14:09:46  jcmurphy
+# 1.67 - bug in getsql, addition of setserver port
+#
+# Revision 1.11  2000/02/17 04:49:42  jcmurphy
+# ars_SetServerPort
+#
+# Revision 1.10  2000/02/03 21:29:03  jcmurphy
+#
+#
+# fixed bug in GetListSQL
+#
+# Revision 1.9  1999/12/03 22:13:55  jcmurphy
+# *** empty log message ***
+#
 # Revision 1.8  1999/10/03 04:00:27  jcmurphy
 # various
 #
@@ -30,6 +53,7 @@
 # *** empty log message ***
 #
 
+require 5.004;
 use ExtUtils::MakeMaker;
 use Config;
 
@@ -40,8 +64,9 @@ $debug = 0;
 # STEP 1 -> Set the path to your ARS API directory
 
 $ARSAPI     = "/usr/ars/api";
-$ARSAPI     = "/u1/project/ARSperl/api/sol2/api3.2";
+$ARSAPI     = "/u1/project/ARSperl/api/sol2/api4.5";
 #$ARSAPI     = "/u1/project/ARSperl/api/linux/4.0";
+#$ARSAPI     = "/home/jcmurphy/arsperl/api";
 
 # STEP 2 -> Choose your version of ARS
 #           example: 2.0 2.1 3.0 3.1 3.2 4.0
@@ -59,7 +84,7 @@ $WINDOWS = ($^O eq 'MSWin32');
 #        Windows NT: no "-lpthread"
 #        NCR UNIX: add "-lc -lnet"
 
-$AUTODEFINES = "-DPROFILE ";
+$AUTODEFINES = "-DPROFILE -g ";
 $AUTODEFINES = "-D_WIN32" if($WINDOWS);
 
 if($ARSVERSION >= 4.0) {
@@ -78,6 +103,14 @@ elsif($ARSVERSION >= 2.0 && $ARSVERSION < 3.0) {
   $AUTODEFINES .= " -DARS20 " if($ARSVERSION == 2.0);
 }
 
+$AUTODEFINES .= " -DPERL_PATCHLEVEL_IS=$Config{'patchlevel'} -DPERL_SUBVERSION_IS=$Config{'subversion'} -DPERL_BASEREV_IS=".($Config{'baserev'}*10)." ";
+
+if($Config{'baserev'} == 5 &&
+   $Config{'patchlevel'} == 4 &&
+   $Config{'subversion'} == 3) {
+	print "\n\nWARNING: Perl-5.004_03 contained a bugged 'h2ph' application.\nYou should examine line 100 of perl's 'h2ph' script and be sure that it\n
+produces correct syntax (it's missing a close-parenthesis)\n";
+}
 
 push(@extras, CAPI => 'TRUE') if ($] >= 5.005 and $^O eq 'MSWin32'
 				  and $Config{archname} =~ /-object\b/i);
@@ -90,7 +123,16 @@ GenerateSupportDotH("support-h.template", $INCLUDES);
 print "Convering C header files to perl modules ..\n";
 
 foreach ("ar", "arerrno", "nt", "nterrno") {
-  system("h2ph < ${ARSAPI}/include/${_}.h > ARS${_}-h.pm");
+	system("h2ph < ${ARSAPI}/include/${_}.h > ARS${_}-h.pm");
+
+	if((! -e "ARS${_}-h.pm") || (-z "ARS${_}-h.pm")) {
+		open (FD, "> ARS${_}-h.pm") || die "open: $!";
+		print FD "\# your perl installation was either missing the 'h2ph'
+\# utility or it was not in your path with you ran 'perl Makefile.PL'
+
+1;\n";
+		close (FD);
+	}
 }
 
 print "Configuring with options:\n";
@@ -194,6 +236,26 @@ sub GenerateSupportDotH {
 		print FD "  { $code, \t\t\"\L$1\E\" },\n";
 	    }
 	} 
+	elsif(/CHARMENUTYPEMAP/) {
+	    print "\tProcessing AR_CHAR_MENU codes..\n";
+	    my($code, $line);
+	    foreach $line (grep (/^\#define\s+AR_CHAR_MENU.*/, @arh)) {
+		$code = (split(/\s/, $line))[1];
+		print "\t\t$code\n" if $debug;
+		$code =~ /^AR_CHAR_MENU_(\w+)/;
+		print FD "  { $code, \t\t\"\L$1\E\" },\n";
+	    }
+	}
+	elsif(/STATUSRETURNTYPEMAP/) {
+	    print "\tProcessing AR_RETURN codes..\n";
+	    my($code, $line);
+	    foreach $line (grep (/^\#define\s+AR_RETURN.*/, @arh)) {
+		$code = (split(/\s/, $line))[1];
+		print "\t\t$code\n" if $debug;
+		$code =~ /^AR_RETURN_(\w+)/;
+		print FD "  { $code, \t\t\"\L$1\E\" },\n";
+	    }
+	}
 	elsif(/SCHEMAPERMISSIONTYPEMAP/) {
 	    print "\tProcessing AR_PERMISSIONS (Schema) codes..\n";
 	    my($code, $line);
@@ -236,6 +298,19 @@ sub GenerateSupportDotH {
 		print FD "  { $code, \t\t\"\L$1\E\" },\n";
 	    }
 	}
+        elsif(/SCHEMATYPEMAP/) {
+            print "\tProcessing AR_SCHEMA codes..\n";
+            my($code, $line);
+            foreach $line (grep (/^\#define\s+AR_SCHEMA.*/, @arh)) {
+		# another instance of poor naming conventions
+		next if $line =~ /_DELETE/;
+                $code = (split(/\s/, $line))[1];
+
+                print "\t\t$code\n" if $debug;
+                $code =~ /^AR_SCHEMA_(\w+)/;
+                print FD "  { $code, \t\t\"\L$1\E\" },\n";
+            }
+        }
 	elsif(/BYTELISTTYPEMAP/) {
 	    print "\tProcessing AR_BYTE_LIST codes..\n";
 	    my($code, $line);
