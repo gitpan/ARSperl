@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl
 #
-# $Header: /u1/project/ARSperl/ARSperl/example/RCS/Show_ALink.pl,v 1.2 1997/11/11 15:04:47 jcmurphy Exp $
+# $Header: /u1/project/ARSperl/ARSperl/example/RCS/Show_ALink.pl,v 1.5 1998/09/14 17:41:05 jcmurphy Exp $
 #
 # EXAMPLE
 #    Show_ALink.pl
@@ -25,6 +25,16 @@
 # 01/12/96
 # 
 # $Log: Show_ALink.pl,v $
+# Revision 1.5  1998/09/14 17:41:05  jcmurphy
+# added ChangeDiary decoding lines
+#
+# Revision 1.4  1998/09/11 17:49:47  jcmurphy
+# updated EXECUTE_ON definitions
+#
+# Revision 1.3  1998/09/11 17:22:13  jcmurphy
+# changed macroParms from array to hash since it is
+# a hashref.
+#
 # Revision 1.2  1997/11/11 15:04:47  jcmurphy
 # added qual decoding
 #
@@ -75,29 +85,40 @@ sub printl {
 #   Simple routine to return a string representing (in english)
 #   the execution mask value(s).
 
-$AR_EXECUTE_ON_NONE =          0;
-$AR_EXECUTE_ON_BUTTON =        1;
-$AR_EXECUTE_ON_RETURN =        2;
-$AR_EXECUTE_ON_SUBMIT =        4;
-$AR_EXECUTE_ON_MODIFY =        8;
-$AR_EXECUTE_ON_DISPLAY =      16;
-$AR_EXECUTE_ON_MODIFY_ALL =   32;
-$AR_EXECUTE_ON_MENU =         64;
-$AR_EXECUTE_ON_MENU_CHOICE = 128;
-$AR_EXECUTE_ON_LOOSE_FOCUS = 256;
-$AR_EXECUTE_ON_SET_DEFAULT = 512;
-$AR_EXECUTE_ON_QUERY =      1024;
+$AR_EXECUTE_ON_NONE          = 0;
+$AR_EXECUTE_ON_BUTTON        = 1;
+$AR_EXECUTE_ON_RETURN        = 2;
+$AR_EXECUTE_ON_SUBMIT        = 4;
+$AR_EXECUTE_ON_MODIFY        = 8;
+$AR_EXECUTE_ON_DISPLAY       = 16;
+$AR_EXECUTE_ON_MODIFY_ALL    = 32;
+$AR_EXECUTE_ON_MENU          = 64;
+$AR_EXECUTE_ON_MENU_CHOICE   = 128;
+$AR_EXECUTE_ON_LOOSE_FOCUS   = 256;
+$AR_EXECUTE_ON_SET_DEFAULT   = 512;
+$AR_EXECUTE_ON_QUERY         = 1024;
+$AR_EXECUTE_ON_AFTER_MODIFY  = 2048;  # Added in 3.2
+$AR_EXECUTE_ON_AFTER_SUBMIT  = 4096;
+$AR_EXECUTE_ON_GAIN_FOCUS    = 8192;
+$AR_EXECUTE_ON_WINDOW_OPEN   = 16384;
+$AR_EXECUTE_ON_WINDOW_CLOSE  = 32768;
 
 %ars_ExecuteOn = ($AR_EXECUTE_ON_BUTTON, "Button", 
-		  $AR_EXECUTE_ON_RETURN, "Return",
-		  $AR_EXECUTE_ON_SUBMIT, "Submit",
-		  $AR_EXECUTE_ON_MODIFY, "Modify",
-		  $AR_EXECUTE_ON_DISPLAY, "Display", 
-		  $AR_EXECUTE_ON_MENU, "Menu", 
-		  $AR_EXECUTE_ON_MENU_CHOICE, "Menu_Choice", 
-		  $AR_EXECUTE_ON_LOOSE_FOCUS, "Loose_Focus", 
-		  $AR_EXECUTE_ON_SET_DEFAULT, "Set_Default",
-		  $AR_EXECUTE_ON_QUERY, "Query" );
+    $AR_EXECUTE_ON_RETURN,        "Return",
+    $AR_EXECUTE_ON_SUBMIT,        "Submit",
+    $AR_EXECUTE_ON_MODIFY,        "Modify",
+    $AR_EXECUTE_ON_DISPLAY,       "Display", 
+    $AR_EXECUTE_ON_MENU,          "Menu", 
+    $AR_EXECUTE_ON_MENU_CHOICE,   "Menu_Choice", 
+    $AR_EXECUTE_ON_LOOSE_FOCUS,   "Loose_Focus", 
+    $AR_EXECUTE_ON_SET_DEFAULT,   "Set_Default",
+    $AR_EXECUTE_ON_QUERY,         "Query",
+    $AR_EXECUTE_ON_AFTER_MODIFY,  "After_Modify",
+    $AR_EXECUTE_ON_AFTER_SUBMIT,  "After_Submit",
+    $AR_EXECUTE_ON_GAIN_FOCUS,    "Gain_Focus",
+    $AR_EXECUTE_ON_WINDOW_OPEN,   "Window_Open",
+    $AR_EXECUTE_ON_WINDOW_CLOSE,  "Window_Close" 
+		  );
 
 sub DecodeExecMask {
     my $m = shift;
@@ -306,12 +327,12 @@ sub ProcessMacroStruct {
 
     if(defined($m)) {
 	printl $t, "Macro Name  : \"$m->{macroName}\"\n";
-	printl $t, "Macro Params:\n";
-	@p = @{$m->{macroParms}};
-	for($i = 0; $i <= $#p; $i+=2) {
-	    printl $t+1, "$i Name: $p[$i][0]\n";
-	    printl $t+1, "   Val: ".$p[$i+1][1]."\n";
+	printl $t, "Macro Params: $m->{macroParms}\n";
+
+	foreach (keys %{$m->{macroParms}}) {
+	    printl $t+1, "$_ = $m->{macroParms}{$_}\n";
 	}
+
 	printl $t, "Macro Text  :\n**START**\n$m->{macroText}\n**END**\n";
     }
 }
@@ -427,7 +448,13 @@ print  "Help Text: ".$a->{helpText}."\n";
 print  "Owner: ".$a->{owner}."\n";
 print  "Last changed by: ".$a->{lastChanged}."\n";
 print  "Last Modified: ".localtime($a->{timestamp})."\n";
-print  "Change Diary: ".$a->{changeDiary}."\n";
+print  "Change Diary: $a->{changeDiary}\n";
+
+foreach (@{$a->{changeDiary}}) {
+    print "\tTIME: ".localtime($_->{timestamp})."\n";
+    print "\tUSER: $_->{user}\n";
+    print "\tWHAT: $_->{value}\n";
+}
 
 # Log out of the server.
 

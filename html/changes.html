@@ -8,6 +8,85 @@
  for each release of ARSperl.
  <P>
  <DL>
+
+    <DT> 1.61 <DD>
+    <UL>
+  <LI>  new utility: example/AddUsersToGroup.pl - bulk add a bunch
+		of users to a specified group 
+  <LI>  new utility: example/DelUsersFromGroup.pl - bulk delete a bunch
+		of users from a specified group 
+  <LI>  fixed various problems with join schema entry-id handling
+  <LI>  fixed uninitialized variable warnings
+  <LI>  fixed bug in indexList returned by ars_GetSchema()
+  <LI>  updated all Get&lt;object&gt; functions so that changeDiary
+          is fully decoded. 
+  <LI>  changed return value of ars_DeleteEntry() so that
+           ars_DeleteEntry() || die() will work as expected. 
+  <LI>  fixed problem in example/Show_ALink.pl
+  <LI>  added/updated helper func: ars_decodeStatusHistory()
+  <LI>  added example/ars_decodeStatusHistory.pl
+  <LI>  fixed ars_GetSchema typo/bug w/regards to adminGroupList
+  <LI>  fixed GetField.pl example so that it decodes everything
+  <LI>  patch for bug in ars_GetServerInfo()
+  <LI>  updated Makefile.PL to dynamically generate the support.h
+           file based on the ar.h file specified.
+    </UL>
+
+    <DT> 1.6001 BETA <DD>
+    <UL>
+  <LI>   patch for bug in ars_CreateEntry()
+
+  <LI>  added ARS32 conditional compilation for AdminExtension 
+           routines (which were removed as of ars3.2 api)
+    </UL>
+
+    <DT> 1.6000 BETA <DD>
+    <UL>
+  <LI>   removed most of the PPERLC and AWP stuff that was intended
+           to help the port to ActiveState perl.  Use the One True Perl.
+ 
+  <LI>   Changed many of the allocations to use perl's memory manager,
+           except where the structure or element is grown further internally
+           by ARS, or where the structure is non-trivial to free().  I still
+           have concerns about some of the un-freed allocations in 
+           supportrev.c, but at least ALL of the demo scripts, 
+           including ARSDoc-1.11 (with small patch submitted to list) now 
+           run, and produce the right results.
+ 
+  <LI>   Removed all references to ZEROMEM in favor of perl's Zero, which
+           is guaranteed to work everywhere, and doesn't need additional logic.
+ 
+  <LI>   fixed a couple of small typos, including one in a elliptical 
+           declaration (...) which didn't have a comma separator.
+ 
+  <LI>   Changed the logic of CVLD in one place that was attempting to free()
+           null pointers.
+    </UL>
+
+    <DT> 1.56 <DD>
+    <UL>
+  <LI>   removed most of the PPERLC and AWP stuff that was intended
+	   to help the port to ActiveState perl.  Use the One True Perl.
+ 
+  <LI>   Changed many of the allocations to use perl's memory manager,
+ 	   except where the structure or element is grown further internally
+	   by ARS, or where the structure is non-trivial to free().  I still
+	   have concerns about some of the un-freed allocations in 
+	   supportrev.c, but at least ALL of the demo scripts, 
+	   including ARSDoc-1.11 (with small patch submitted to list) now 
+	   run, and produce the right results.
+ 
+  <LI>   Removed all references to ZEROMEM in favor of perl's Zero, which
+	   is guaranteed to work everywhere, and doesn't need additional logic.
+ 
+  <LI>   fixed a couple of small typos, including one in a elliptical 
+	   declaration (...) which didn't have a comma separator.
+ 
+  <LI>   Changed the logic of CVLD in one place that was attempting to free()
+	   null pointers.
+
+    </UL>
+
     <DT> 1.56 <DD>
     <UL>
 
@@ -30,7 +109,7 @@
            (D.J.Adams@soton.ac.uk)
  
   <LI>  patched perl_BuildEntryIdList to make it more robust
-           (Ulrich Pfeifer <pfeifer@wait.de>)
+           (Ulrich Pfeifer &lt;pfeifer@wait.de&gt;)
  
   <LI>  patched ars_GetCharMenu for bug "GetCharMenu doesn't
            return a qualifier for query menus" (D.J.Adams@soton.ac.uk)
@@ -217,6 +296,5 @@
  </DL> 
 <P>
 <a href="index.html">Back to ARSperl Home Page</a>
-<P>
 </body>
 </html>

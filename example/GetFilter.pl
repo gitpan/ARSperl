@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl
 #
-# $Header: /u1/project/ARSperl/ARSperl/example/RCS/GetFilter.pl,v 1.3 1998/03/12 20:44:57 jcmurphy Exp $
+# $Header: /u1/project/ARSperl/ARSperl/example/RCS/GetFilter.pl,v 1.5 1998/09/16 14:38:31 jcmurphy Exp $
 #
 # NAME
 #   GetFilter.pl
@@ -16,6 +16,12 @@
 #   jcmurphy@acsu.buffalo.edu
 #
 # $Log: GetFilter.pl,v $
+# Revision 1.5  1998/09/16 14:38:31  jcmurphy
+# updated changeDiary code
+#
+# Revision 1.4  1998/04/22 17:25:46  jcmurphy
+# added example code to show decoding of SQL/SetFields actions.
+#
 # Revision 1.3  1998/03/12 20:44:57  jcmurphy
 # minor changes to allow specification of a server
 #
@@ -53,7 +59,7 @@ sub printl {
 
 ($server, $username, $password, $filtername) = @ARGV;
 if(!defined($filtername)) {
-    print "Usage: $0 [username] [password] [filtername]\n";
+    print "Usage: $0 [server] [username] [password] [filtername]\n";
     exit 0;
 }
 
@@ -97,6 +103,12 @@ print "timestamp   : ".localtime($finfo->{"timestamp"})."\n";
 print "owner       : ".$finfo->{"owner"}."\n";
 print "lastChanged : ".$finfo->{"lastChanged"}."\n";
 print "changeDiary : ".$finfo->{"changeDiary"}."\n";
+
+foreach (@{$finfo->{"changeDiary"}}) {
+    print "\tTIME: ".localtime($_->{"timestamp"})."\n";
+    print "\tUSER: $_->{"user"}\n";
+    print "\tWHAT: $_->{"value"}\n";
+}
 
 ars_Logoff($ctrl);
 
@@ -256,6 +268,13 @@ sub ProcessFunctionList {
 sub ProcessSetFields {
     my $field = shift;
  
+    if(defined($field->{sql})) {
+	printl 3, "SQL:\n";
+	printl 4, "server: $field->{sql}->{server}\n";
+	printl 4, "sqlCommand: $field->{sql}->{sqlCommand}\n";
+	printl 4, "valueIndex: $field->{sql}->{valueIndex}\n";
+    }
+
     if(defined($field->{valueType})) {
 	printl 3, "valueType: $field->{valueType}\n";
     }

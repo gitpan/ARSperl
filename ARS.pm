@@ -21,6 +21,21 @@
 #    Comments to: arsperl@smurfland.cit.buffalo.edu
 #
 # $Log: ARS.pm,v $
+# Revision 1.34  1998/09/16 14:18:42  jcmurphy
+# v1.61
+#
+# Revision 1.33  1998/09/11 18:00:33  jcmurphy
+# updated decodeStatusHistory helper function
+#
+# Revision 1.32  1998/08/07 18:39:28  jcmurphy
+# 1.6002
+#
+# Revision 1.31  1998/05/04 17:40:14  jcmurphy
+# 1.6001
+#
+# Revision 1.30  1998/03/31 23:30:29  jcmurphy
+# 1.6000 (beta) includes NT patch from  Bill Middleton <wjm@metronet.com>
+#
 # Revision 1.29  1998/03/31 15:54:25  jcmurphy
 # version=1.56
 #
@@ -171,9 +186,10 @@ ars_GetListVUI ars_GetServerInfo
 ars_CreateActiveLink ars_CreateAdminExtension
 ars_GetControlStructFields ars_GetVUI
 $ars_errstr %ARServerStats %ars_errhash
+ars_decodeStatusHistory
 );
 
-$VERSION   = '1.56';
+$VERSION   = '1.61';
 $DEBUGGING = 0;
 
 bootstrap ARS $VERSION;
@@ -364,16 +380,22 @@ sub ars_decodeStatusHistory {
     my ($sval) = shift;
     my ($enum) = 0;
     my ($pair, $ts, $un);
+    my (@retval);
 
     foreach $pair (split(/\003/, $sval)) {
-	print $enum++.": ";
 	if($pair ne "") {
 	    ($ts, $un) = split(/\004/, $pair);
-	    print localtime($ts)." - $un\n";
+	    $retval[$enum]->{USER} = $un;
+	    $retval[$enum]->{TIME} = $ts;
 	} else {
-	    print "no value for this enumeration\n";
+	    # no value for this enumeration
+	    $retval[$enum]->{USER} = undef;
+	    $retval[$enum]->{TIME} = undef;
 	}
+	$enum++;
     }
+
+    return @retval;
 }
 
 #define AR_DEFN_DIARY_SEP        '\03'     /* diary items separator */

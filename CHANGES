@@ -1,14 +1,82 @@
-$Header: /u1/project/ARSperl/ARSperl/RCS/CHANGES,v 1.20 1998/03/30 19:00:19 jcmurphy Exp jcmurphy $
+$Header: /u1/project/ARSperl/ARSperl/RCS/CHANGES,v 1.25 1998/09/18 14:42:50 jcmurphy Exp $
 
 CHANGES for ARSperl
 
 Revision history for ARSperl.
 
+BM  = Bill Middleton <wjm@metronet.com>
+JCM = Jeff Murphy    <jcmurphy@buffalo.edu>
+JWM = Joel Murphy    <jmurphy@acsu.buffalo.edu>
+
+note: items tagged with a + denoted changes that are incompatible with
+previous versions of arsperl and may require altering of some arsperl
+scripts.
+
 MM/DD/YY
 =======================================================================
 #######################################################################
 =======================================================================
-03/31/98        (1.55)
+09/16/98        (1.61)
+
+  o (JCM)  new utility: example/AddUsersToGroup.pl - bulk add a bunch
+		of users to a specified group 
+  o (JCM)  new utility: example/DelUsersFromGroup.pl - bulk delete a bunch
+		of users from a specified group 
+  o (JCM)  fixed uninitialized variable warnings
+  o (JCM)  fixed various problems with join schema entry-id handling
+  o (JCM)  fixed bug in indexList returned by ars_GetSchema()
+  + (JCM)  updated all Get<object> functions so that changeDiary
+           is fully decoded.
+  + (JCM)  changed return value of ars_DeleteEntry() so that
+           ars_DeleteEntry() || die() will work as expected.
+  o (JCM)  fixed problem in example/Show_ALink.pl
+  o (JCM)  added/updated helper func: ars_decodeStatusHistory()
+  o (JCM)  added example/ars_decodeStatusHistory.pl
+  o (JCM)  fixed ars_GetSchema typo/bug w/regards to adminGroupList
+  o (JCM)  fixed GetField.pl example so that it decodes everything
+  o (JCM)  patch for bug in ars_GetServerInfo()
+  o (JCM)  updated Makefile.PL to dynamically generate the support.h
+           file based on the ar.h file specified.
+
+=======================================================================
+#######################################################################
+=======================================================================
+05/04/98        (1.6001 BETA)
+
+  o (BM)   patch for bug in ars_CreateEntry()
+
+  o (JCM)  added ARS32 conditional compilation for AdminExtension 
+           routines (which were removed as of ars3.2 api)
+
+=======================================================================
+#######################################################################
+=======================================================================
+03/31/98        (1.6000 BETA)
+
+  o (BM)   removed most of the PPERLC and AWP stuff that was intended
+	   to help the port to ActiveState perl.  Use the One True Perl.
+ 
+  o (BM)   Changed many of the allocations to use perl's memory manager,
+ 	   except where the structure or element is grown further internally
+	   by ARS, or where the structure is non-trivial to free().  I still
+	   have concerns about some of the un-freed allocations in 
+	   supportrev.c, but at least ALL of the demo scripts, 
+	   including ARSDoc-1.11 (with small patch submitted to list) now 
+	   run, and produce the right results.
+ 
+  o (BM)   Removed all references to ZEROMEM in favor of perl's Zero, which
+	   is guaranteed to work everywhere, and doesn't need additional logic.
+ 
+  o (BM)   fixed a couple of small typos, including one in a elliptical 
+	   declaration (...) which didn't have a comma separator.
+ 
+  o (BM)   Changed the logic of CVLD in one place that was attempting to free()
+	   null pointers.
+
+=======================================================================
+#######################################################################
+=======================================================================
+03/31/98        (1.56)
 
   o (JCM)  fixed a problem caused by some debugging code that
            was left in 1.55 accidentally.
@@ -149,7 +217,7 @@ MM/DD/YY
   o  (JCM) new functions and doc on new functions and new examples for some
 	   of these new functions.
 
-  o  (JCM) altered return value of perl_ARStatusStruct so that it 
+  +  (JCM) altered return value of perl_ARStatusStruct so that it 
            returns a hash of the various StatusStruct members so that
            reversing the operation is simpler. scripts that, for example,
            retrieve active link definitions and print them out that previous
