@@ -13,26 +13,29 @@
 
 use ExtUtils::MakeMaker;
 
-$ARS_LDPATH = "-L/usr/ars/api/lib";
-$INCLUDES = "-I/usr/ars/api/include";
+$ARS_LDPATH = "-L/project/ar/api/lib";
+$INCLUDES = "-I/project/ar/api/include";
 $ARS_LIBS = "-lar -lnsl";
 
 WriteMakefile(
 	      'NAME'	=> 'ARS',
-	      'VERSION'	=> '1.3',
+	      'VERSION'	=> '1.32',
 	      'LIBS'	=> ["${ARS_LDPATH} ${ARS_LIBS}"],
 #
 # If you want to free() allocated memory, don't define WASTE_MEM
 # In the past, there were some bad free() problems so we offered
 # this option.
 #
-#	      'DEFINE'	=> '-g -DPROFILE',
-	      'DEFINE'	=> '-g -DWASTE_MEM -DPROFILE',
+# If you are running ARS2.0.2 or anything less than 2.1, you should
+# add -DARS20 to the DEFINE line.
+#
+#	      'DEFINE'	=> '-g -DPROFILE -DWASTE_MEM',
+	      'DEFINE'	=> '-DPROFILE',
 	      'OBJECT'  => "ARS.o",
 	      'INC'	=> "${INCLUDES}",
 #
 # if you have trouble under solaris when linking (bfd assertion 
 # failures) try uncommenting the following:
 #
-	      'LD' => "/usr/ccs/bin/ld",
+#	      'LD' => "/usr/ccs/bin/ld",
 );
