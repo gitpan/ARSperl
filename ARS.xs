@@ -1,7 +1,9 @@
 /*
-    ARSperl - An ARS2.x / Perl5.x Integration Kit
+$Header: /u1/project/ARSperl/ARSperl/RCS/ARS.xs,v 1.26 1997/02/20 20:27:47 jcmurphy Exp $
 
-    Copyright (C) 1995,1996 
+    ARSperl - An ARS2.x-3.0 / Perl5.x Integration Kit
+
+    Copyright (C) 1995,1996,1997 
 	Joel Murphy, jmurphy@acsu.buffalo.edu
         Jeff Murphy, jcmurphy@acsu.buffalo.edu
  
@@ -18,14 +20,74 @@
     You should have received a copy of the GNU General Public License
     along with this program; if not, write to the Free Software
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+
+    Comments to:  arsperl@smurfland.cit.buffalo.edu
+                  (this is a *mailing list*)
+
+    Bugs to: arsperl-bugs@smurfland.cit.buffalo.edu
  
-    Comments to: arsperl@smurfland.cit.buffalo.edu
+    LOG:
+
+$Log: ARS.xs,v $
+Revision 1.26  1997/02/20 20:27:47  jcmurphy
+added some minor code to handle decoding TR. and DB. values in qualifications
+
+Revision 1.25  1997/02/19 22:39:28  jcmurphy
+fixed problem with bad free() in ars_Login
+
+Revision 1.24  1997/02/19 21:55:38  jmurphy
+fixed bug in perl_ARValueStruct
+
+Revision 1.23  1997/02/19 20:24:41  jcmurphy
+*** empty log message ***
+
+Revision 1.22  1997/02/19 15:30:25  jcmurphy
+fixed bad goto
+
+Revision 1.21  1997/02/19 14:21:48  jcmurphy
+oops. fixed double call to getlistserver in ars_Login
+
+Revision 1.20  1997/02/18 18:45:54  jcmurphy
+ran thru -Wall and cleaned up some blunders and stuff
+
+Revision 1.19  1997/02/18 16:37:32  jmurphy
+a couple fixes.  added destructors for control struct, qualifier struct
+
+Revision 1.18  1997/02/17 16:53:35  jcmurphy
+commented ARTermination back out for a little bit longer.
+
+Revision 1.17  1997/02/17 16:21:12  jcmurphy
+uncommented ARTermintation(), added GetListServer to ars_Login incase
+no server is specified. added ars_GetCurrentServer so you can determine
+what server you connected to (if you didnt specify one).
+
+Revision 1.16  1997/02/14 20:48:06  jcmurphy
+un-commented the ARInitialization() call. this allows
+you to write a perl script that connects to a private
+server.
+
+Revision 1.15  1997/02/14 20:38:49  jcmurphy
+fixed phantom function call. initialized some un-inited stuff
+
+Revision 1.14  1997/02/13 15:21:06  jcmurphy
+modified comments
+
+
 */
 
 #include "ar.h"
 #include "arerrno.h"
 #include "arextern.h"
 #include "arstruct.h"
+#include "arfree.h"
+
+#include "nt.h"
+#include "nterrno.h"
+#include "ntfree.h"
+#include "ntsextrn.h"
+#if AR_EXPORT_VERSION < 3
+#include "ntcextrn.h"
+#endif
 
 #include "EXTERN.h"
 #include "perl.h"
@@ -80,6 +142,7 @@ SV *perl_ARIndexStruct(ARIndexStruct *);
 SV *perl_ARFieldLimitStruct(ARFieldLimitStruct *);
 SV *perl_ARFunctionAssignStruct(ARFunctionAssignStruct *);
 SV *perl_ARArithOpAssignStruct(ARArithOpAssignStruct *);
+/* int XARReleaseCurrentUser(ARControlStruct *, char *, ARStatusStruct *, int, int, int); */
 void dup_Value(ARValueStruct *, ARValueStruct *);
 ARArithOpStruct *dup_ArithOp(ARArithOpStruct *);
 void dup_ValueList(ARValueList *, ARValueList *);
@@ -161,13 +224,42 @@ int ARError(int returncode, ARStatusList status) {
   return 1;
 }
 
+/* same as ARError, just uses the NT structures instead */
+ 
+int NTError(int returncode, NTStatusList status) {
+  char *index;         /* Index into error buffer */
+  int item;            /* Error item counter */
+  
+  ars_errstr = errbuf;
+  errbuf[0] = '\0';
+  if (returncode==0) {
+#ifndef WASTE_MEM
+/*    FreeNTStatusList(&status, FALSE); */
+#endif
+    return 0;
+  }
+  index = errbuf;
+  for ( item=0; item < status.numItems; item++ ) {
+    if ( item > 0 ) {
+      strcpy(index, "  ");
+      index += 2;
+    }
+    strcpy( index, status.statusList[item].messageText );                
+    index += strlen(index);
+  }
+#ifndef WASTE_MEM
+  FreeNTStatusList(&status, FALSE);
+#endif
+  return 1;
+}
+
 SV *perl_ARStatusStruct(ARStatusStruct *in) {
   char *msg;
   SV *ret;
   msg = mallocnn(strlen(in->messageText) + 100);
   sprintf(msg, "Type %d Num %d Text [%s]\n",
 	  in->messageType,
-	  in->messageNum,
+	  (int)in->messageNum,
 	  in->messageText);
   ret = newSVpv(msg, 0);
 #ifndef WASTE_MEM
@@ -267,7 +359,7 @@ SV *perl_ARValueStruct(ARValueStruct *in) {
 			  (ARS_fn)perl_diary,
 			  sizeof(ARDiaryStruct));
 #ifndef WASTE_MEM
-/*      FreeARDiaryList(&diaryList,FALSE); */
+      FreeARDiaryList(&diaryList,FALSE); 
 #endif
       return array;
     }
@@ -277,13 +369,13 @@ SV *perl_ARValueStruct(ARValueStruct *in) {
     return newSViv(in->u.timeVal);
   case AR_DATA_TYPE_BITMASK:
     return newSViv(in->u.maskVal);
-#if AR_EXPORT_VERSION < 3
+#if AR_EXPORT_VERSION >= 3
   case AR_DATA_TYPE_BYTES:
-    return perl_ARByteList(&in->u.byteListVal);
+    return perl_ARByteList(in->u.byteListVal);
   case AR_DATA_TYPE_ULONG:
     return newSViv(in->u.ulongVal); /* FIX -- does perl have unsigned long? */
   case AR_DATA_TYPE_COORDS:
-      return perl_ARList((ARList *)&in->u.coordListVal,
+      return perl_ARList((ARList *)in->u.coordListVal,
 			 (ARS_fn)perl_ARCoordStruct,
 			 sizeof(ARCoordStruct));
 #endif
@@ -475,7 +567,6 @@ SV *perl_ARDDEStruct(ARDDEStruct *in) {
 
 SV *perl_ARActiveLinkActionStruct(ARActiveLinkActionStruct *in) {
   HV *hash=newHV();
-  int i;
   switch (in->action) {
   case AR_ACTIVE_LINK_ACTION_MACRO:
     hv_store(hash, "macro", strlen("macro"),
@@ -514,8 +605,6 @@ SV *perl_ARActiveLinkActionStruct(ARActiveLinkActionStruct *in) {
 
 SV *perl_ARFilterActionNotify(ARFilterActionNotify *in) {
   HV *hash=newHV();
-  AV *array=newAV();
-  int i;
   hv_store(hash, "user", strlen("user"),
  	   newSVpv(in->user, 0), 0);
   if(in->notifyText) 
@@ -541,7 +630,6 @@ SV *perl_ARFilterActionNotify(ARFilterActionNotify *in) {
 
 SV *perl_ARFilterActionStruct(ARFilterActionStruct *in) {
   HV *hash=newHV();
-  int i;
   switch (in->action) {
   case AR_FILTER_ACTION_NOTIFY:
     hv_store(hash, "notify", strlen("notify"),
@@ -896,7 +984,7 @@ SV *perl_ARPermissionList(ARPermissionList *in) {
   int i;
   
   for (i=0; i<in->numItems; i++) {
-    sprintf(groupid, "%i", in->permissionList[i].groupId);
+    sprintf(groupid, "%i", (int)in->permissionList[i].groupId);
     switch (in->permissionList[i].permissions) {
     case AR_PERMISSIONS_NONE:
       hv_store(hash, groupid, strlen(groupid),
@@ -1036,7 +1124,7 @@ SV *perl_ARSortList(ARSortList *in) {
 
 SV *perl_ARByteList(ARByteList *in) {
   HV *hash = newHV();
-  SV *byte_list = newSVpv(in->bytes, in->numItems);
+  SV *byte_list = newSVpv((char *)in->bytes, in->numItems);
   
   switch (in->type) {
   case AR_BYTE_LIST_SELF_DEFINED:
@@ -1091,6 +1179,7 @@ ARArithOpStruct *dup_ArithOp(ARArithOpStruct *in) {
   n->operation = in->operation;
   dup_FieldValueOrArith(&n->operandLeft, &in->operandLeft);
   dup_FieldValueOrArith(&n->operandRight, &in->operandRight);
+  return n;
 }
 
 void dup_ValueList(ARValueList *n, ARValueList *in) {
@@ -1275,8 +1364,14 @@ SV *perl_ARFieldValueOrArithStruct(ARFieldValueOrArithStruct *in) {
 			 (ARS_fn)perl_ARValueStruct,
 			 sizeof(ARValueStruct)), 0);
     break;
-/*  case AR_FIELD_TRAN:
-  case AR_FIELD_DB: */
+  case AR_FIELD_TRAN:
+    hv_store(hash, "TR_fieldId", strlen("TR_fieldId"),
+	     newSViv(in->u.fieldId), 0);
+    break;
+  case AR_FIELD_DB:
+    hv_store(hash, "DB_fieldId", strlen("DB_fieldId"),
+	     newSViv(in->u.fieldId), 0);
+    break;
   case AR_LOCAL_VARIABLE:
     hv_store(hash, "variable", strlen("variable"),
 	     newSViv(in->u.variable), 0);
@@ -1432,7 +1527,7 @@ ARGetFieldCached(ARControlStruct *ctrl, ARNameType schema, ARInternalId id,
 	 SvTYPE(fields = (HV *)SvRV(*schema_fields)) == SVt_PVHV))
     goto cache_fail;
   /* dereference with field id */
-  sprintf(field_string, "%i", id);
+  sprintf(field_string, "%i", (int)id);
   field = hv_fetch(fields, field_string, strlen(field_string), TRUE);
   if (! (field && SvROK(*field) && SvTYPE(base = (HV *)SvRV(*field))))
     goto cache_fail;
@@ -1511,7 +1606,7 @@ ARGetFieldCached(ARControlStruct *ctrl, ARNameType schema, ARInternalId id,
       fields = (HV *)SvRV(*schema_fields);
     }
     /* dereference hash with field id */
-    sprintf(field_string, "%i", id);
+    sprintf(field_string, "%i", (int)id);
     field = hv_fetch(fields, field_string, strlen(field_string), TRUE);
     if (! field) return ret;
     if (! SvROK(*field) ||
@@ -1526,7 +1621,7 @@ ARGetFieldCached(ARControlStruct *ctrl, ARNameType schema, ARInternalId id,
 #else
     display_ref = newSViv(0);
     sv_setref_pv(display_ref, "ARDisplayListPtr",
-		 (void *)dup_DisplayList(my_display));
+		 (void *)dup_DisplayList(&my_display));
     hv_store(base, "name", strlen("name"), display_ref, 0);
 #endif
     hv_store(base, "type", strlen("type"), newSViv(my_dataType), 0);
@@ -1535,6 +1630,8 @@ ARGetFieldCached(ARControlStruct *ctrl, ARNameType schema, ARInternalId id,
 }
 
 MODULE = ARS		PACKAGE = ARS		PREFIX = ARS
+
+PROTOTYPES: ENABLE
 
 int
 isa_int(...)
@@ -1598,7 +1695,8 @@ ars_LoadQualifier(ctrl,schema,qualstring)
 	  int ret;
 	  ARQualifierStruct *qual = mallocnn(sizeof(ARQualifierStruct));
 	  ARStatusList status;
-	
+	  
+	  /* this gets freed below in the ARQualifierStructPTR package */
 	  ret = ARLoadARQualifierStruct(ctrl, schema, NULL, qualstring, qual, &status);
 #ifdef PROFILE
 	  ((ars_ctrl *)ctrl)->queries++;
@@ -1616,16 +1714,29 @@ ars_LoadQualifier(ctrl,schema,qualstring)
 	RETVAL
 
 void
+__ars_Termination()
+	CODE:
+	{
+	  int ret;
+	  ARStatusList status;
+	  
+	  ret = ARTermination(&status);
+	  if (ARError(ret, status)) {
+	    warn("failed in ARTermination: %s\n", ars_errstr);
+	  }
+	}
+
+void
 __ars_init()
 	CODE:
 	{
 	  int ret;
 	  ARStatusList status;
 	
-	/*  ret = ARInitialization(&status);
+	  ret = ARInitialization(&status);
 	  if (ARError(ret, status)) {
 	    croak("unable to initialize ARS module");
-	  } */
+	  }
 	}
 
 ARControlStruct *
@@ -1635,24 +1746,16 @@ ars_Login(server,username,password)
 	char *		password
 	CODE:
 	{
-	  int ret;
+	  int ret, s_ok = 1;
 	  ARStatusList status;
 	  ARServerNameList serverList;
 	  ARControlStruct *ctrl;
 #ifdef PROFILE
 	  struct timeval tv;
 #endif
-	  
-	  ret = ARGetListServer(&serverList, &status);
-	  if (ARError(ret, status)) {
-	    RETVAL = NULL;
-	    goto ar_login_end;
-	  }
-	  if (serverList.numItems < 0) {
-	    ars_errstr = "no servers available";
-	    RETVAL = NULL;
-	    goto ar_login_end;
-	  }
+
+	  RETVAL = NULL;	  
+	  /* this gets freed below in the ARControlStructPTR package */
 	  ctrl = (ARControlStruct *)mallocnn(sizeof(ars_ctrl));
 	  ((ars_ctrl *)ctrl)->queries = 0;
 	  ((ars_ctrl *)ctrl)->startTime = 0;
@@ -1670,16 +1773,41 @@ ars_Login(server,username,password)
 	  strncpy(ctrl->password, password, sizeof(ctrl->password));
 	  ctrl->password[sizeof(ctrl->password)-1] = 0;
 	  ctrl->language[0] = 0;
-	  if (!server || !*server)
+	  if (!server || !*server) {
+	    ret = ARGetListServer(&serverList, &status);
+	    if (ARError(ret, status)) {
+	      RETVAL = NULL;
+	      goto ar_login_end;
+	    }
+	    if (serverList.numItems < 0) {
+	      ars_errstr = "no servers available";
+	      RETVAL = NULL;
+	      goto ar_login_end;
+	    }
 	    server = serverList.nameList[0];
+	    s_ok = 0;
+	  }
 	  strncpy(ctrl->server, server, sizeof(ctrl->server));
 	  ctrl->server[sizeof(ctrl->server)-1] = 0;
 	  RETVAL = ctrl;
 #ifndef WASTE_MEM
+	if(s_ok == 0)
 	  FreeARServerNameList(&serverList,FALSE);
 #endif
-	  goto ar_login_end;
 	ar_login_end:;
+	}
+	OUTPUT:
+	RETVAL
+
+SV *
+ars_GetCurrentServer(ctrl)
+	ARControlStruct *	ctrl
+	CODE:
+	{
+	 RETVAL = NULL;
+	 if(ctrl && ctrl->server) {
+	    RETVAL = newSVpv(ctrl->server, strlen(ctrl->server));
+	 } 
 	}
 	OUTPUT:
 	RETVAL
@@ -1715,9 +1843,11 @@ ars_Logoff(ctrl,a=0,b=0,c=1)
 	    if (!ctrl) return;
 	    ret = XARReleaseCurrentUser(ctrl, ctrl->user, &status, a, b, c);
 	    ARError(ret, status);
-	    /* FIX    ret = ARTermination(&status);
-	       ARError(ret, status);
-	       free(ctrl); */
+	/*
+	    ret = ARTermination(&status);
+	    ARError(ret, status);
+	    free(ctrl);
+	*/
 	}
 
 void
@@ -1960,7 +2090,7 @@ ars_DeleteEntry(ctrl,schema,entry_id)
 	  AREntryIdList entryList;
 	  AV *input_list;
 	  int i;
-	  
+	  RETVAL=-1; /* assume error */
 	  /* build entryList */
 	  if (SvROK(entry_id)) {
 	    if (SvTYPE(input_list = (AV *)SvRV(entry_id)) == SVt_PVAV) {
@@ -2002,6 +2132,7 @@ ars_DeleteEntry(ctrl,schema,entry_id)
 	  free(entryList.entryIdList);
 #endif
 #else /* ARS 2 */
+	  RETVAL=-1; /* assume error */
 	  entryId = SvPV(entry_id, na);
 	  ret = ARDeleteEntry(ctrl, schema, entryId, &status);
 #endif
@@ -2027,10 +2158,8 @@ ars_GetEntry(ctrl,schema,entry_id,...)
 	{
 	  int c = items - 3, i, ret;
 	  ARInternalIdList  idList;
-	  int id_len;
 	  ARFieldValueList  fieldList;
 	  ARStatusList      status;
-	  ARTimestamp       v;
 	  char *entryId;
 #if AR_EXPORT_VERSION >= 3
 	  SV **fetch_entry;
@@ -2132,7 +2261,6 @@ ars_GetListEntry(ctrl,schema,qualifier,maxRetrieve,...)
 	  unsigned int num_matches;
 	  ARStatusList status;
 	  int ret;
-	  unsigned long field_id;
 #if AR_EXPORT_VERSION >= 3
 	  AREntryListFieldList getListFields, *getList = NULL;
 	  AV *getListFields_array;
@@ -2155,25 +2283,34 @@ ars_GetListEntry(ctrl,schema,qualifier,maxRetrieve,...)
 		    SvROK(*array_entry) &&
 		    SvTYPE(field_hash = (HV*)SvRV(*array_entry)) == SVt_PVHV) {
 		  /* get fieldId, columnWidth and separator from hash */
-		  if (! (hash_entry = hv_fetch(field_hash, "fieldId", 7, 0)))
-		    goto bad_get_list;
+		  if (! (hash_entry = hv_fetch(field_hash, "fieldId", 7, 0))) {
+		    ars_errstr = "bad getListFields";
+#ifndef WASTE_MEM
+		    free(getListFields.fieldsList);
+#endif
+		    goto getlistentry_end;
+		  }
 		  getListFields.fieldsList[i].fieldId = SvIV(*hash_entry);
-		  if (! (hash_entry = hv_fetch(field_hash, "columnWidth", 11, 0)))
-		    goto bad_get_list;
+		  /* printf("field_id: %i\n", getListFields.fieldsList[i].fieldId); */ /* DEBUG */
+		  if (! (hash_entry = hv_fetch(field_hash, "columnWidth", 11, 0))) {
+		    ars_errstr = "bad getListFields";
+#ifndef WASTE_MEM
+		    free(getListFields.fieldsList);
+#endif
+		    goto getlistentry_end;
+		  }
 		  getListFields.fieldsList[i].columnWidth = SvIV(*hash_entry);
-		  if (! (hash_entry = hv_fetch(field_hash, "separator", 9, 0)))
-		    goto bad_get_list;
+		  if (! (hash_entry = hv_fetch(field_hash, "separator", 9, 0))) {
+		    ars_errstr = "bad getListFields";
+#ifndef WASTE_MEM
+		    free(getListFields.fieldsList);
+#endif
+		    goto getlistentry_end;
+		  }
 		  strncpy(getListFields.fieldsList[i].separator,
 			  SvPV(*hash_entry, na),
 			  sizeof(getListFields.fieldsList[i].separator));
 		}
-	      bad_get_list:;
-		/* not a hash reference! */
-		ars_errstr = "bad getListFields";
-#ifndef WASTE_MEM
-		free(getListFields.fieldsList);
-#endif
-		goto getlistentry_end;
 	      }
 	    } else {
 	      ars_errstr = "getListFields must be a reference to an array of field ids";
@@ -2196,6 +2333,7 @@ ars_GetListEntry(ctrl,schema,qualifier,maxRetrieve,...)
 	    sortList.sortList[i].sortOrder = SvIV(ST(i*2+field_off+1));
 	  }
 #if AR_EXPORT_VERSION >= 3
+	  /* printf("getlist: %x\n", getList); */ /* DEBUG */
 	  ret = ARGetListEntry(ctrl, schema, qualifier, getList, &sortList, maxRetrieve, &entryList, &num_matches, &status);
 #else
 	  ret = ARGetListEntry(ctrl, schema, qualifier, &sortList, maxRetrieve, &entryList, &num_matches, &status);
@@ -2549,7 +2687,7 @@ ars_GetServerStatistics(ctrl,...)
 					}
 				}
 #ifndef WASTE_MEM
-				FreeARServerInfoList(serverInfo, FALSE);
+				FreeARServerInfoList(&serverInfo, FALSE);
 				free(requestList.requestList);
 #endif
 			}
@@ -2573,7 +2711,7 @@ ars_GetCharMenu(ctrl,name)
 	  ARNameType	     lastChanged;
 	  char		    *changeDiary;
 	  ARStatusList	     status;
-	  int                ret, i;
+	  int                ret;
 	  HV		    *menuDef = newHV();
 	  SV		    *ref;
 
@@ -2655,10 +2793,9 @@ ars_GetCharMenuItems(ctrl,name)
 	char *			name
 	CODE:
 	{
-	  unsigned int refreshCode;
 	  ARCharMenuStruct menuDefn;
       	  ARStatusList status;
-	  int ret, i;
+	  int ret;
 	  
 	  ret = ARGetCharMenu(ctrl, name, NULL, &menuDefn, NULL, NULL, NULL, NULL, NULL, &status);
 #ifdef PROFILE
@@ -2747,7 +2884,11 @@ ars_GetSchema(ctrl,name)
 	    hv_store(RETVAL, "sortList", 8, perl_ARSortList(&sortList), 0);
 #endif
 #ifndef WASTE_MEM
+#if AR_EXPORT_VERSION >= 3
+	    FreeARPermissionList(&groupList,FALSE);
+#else
 	    FreeARInternalIdList(&groupList,FALSE);
+#endif
 	    FreeARInternalIdList(&adminGroupList,FALSE);
 	    FreeAREntryListFieldList(&getListFields,FALSE);
 	    FreeARIndexList(&indexList,FALSE);
@@ -2869,7 +3010,7 @@ ars_GetField(ctrl,schema,id)
 #ifndef WASTE_MEM
 	    FreeARFieldLimitStruct(&limit,FALSE);
 #if AR_EXPORT_VERSION >= 3
-	    FreeARFieldMappingStruct(&fieldMap,FALSE);
+	    /* FreeARFieldMappingStruct(&fieldMap,FALSE); *//* doesnt exist! */
 	    FreeARDisplayInstanceList(&displayList,FALSE);
 #else
 	    FreeARDisplayList(&displayList,FALSE);
@@ -2920,7 +3061,7 @@ ars_SetEntry(ctrl,schema,entry_id,getTime,...)
 	  SV **fetch_entry;
 	  AREntryIdList entryList;
 	  AV *input_list;
-	  
+	  RETVAL = 0; /* assume error */
 	  if ((items - 4) % 2) {
 	    option = SvIV(ST(offset));
 	    offset ++;
@@ -2930,12 +3071,12 @@ ars_SetEntry(ctrl,schema,entry_id,getTime,...)
 	    goto set_entry_exit;
 	  }
 #else
+	  RETVAL = 0; /* assume error */
 	  if (((items - 4) % 2) || c < 1) {
 	    ars_errstr = "Invalid number of arguments";
 	    goto set_entry_exit;
 	  }
 #endif
-	  RETVAL = 0;
 	  fieldList.numItems = c;
 	  fieldList.fieldValueList = mallocnn(sizeof(ARFieldValueStruct)*c);
 	  for (i=0; i<c; i++) {
@@ -3030,7 +3171,7 @@ ars_SetEntry(ctrl,schema,entry_id,getTime,...)
 #endif	  
 #else
 	  entryId = SvPV(entry_id, na);
-	  ret = ARSetEntry(ctrl, schema, entry_id, &fieldList, getTime, &status);
+	  ret = ARSetEntry(ctrl, schema, SvPV(entry_id, na), &fieldList, getTime, &status);
 #endif
 #ifdef PROFILE
 	  ((ars_ctrl *)ctrl)->queries++;
@@ -3055,7 +3196,7 @@ ars_Export(ctrl,displayTag,...)
 	{
 	  int ret, i, a, c = (items - 2) / 2;
 	  ARStructItemList structItems;
-	  char *buf, *buf_copy;
+	  char *buf;
 	  ARStatusList status;
 	  
 	  if (items % 2 || c < 1) {
@@ -3272,3 +3413,294 @@ ars_GetListAdminExtension(control,changedsince=0)
 	  }
 	}
 
+#if AR_EXPORT_VERSION < 3
+
+int 
+ars_NTDeregisterClient(user, password, filename)
+	char *		user
+	char *		password
+	char *		filename
+	CODE:
+	{
+	  NTStatusList status;
+	  int ret;
+	  RETVAL = 0;
+	  if(user && password && filename) {
+	    ret = NTDeregisterClient(user, password, filename, &status);
+	    if(!NTError(ret, status)) {
+	      RETVAL = 1;
+	    }
+	  }
+	}
+	OUTPUT:
+	RETVAL
+
+int
+ars_NTInitializationClient()
+	CODE:
+	{
+	  NTStatusList status;
+	  int ret;
+	  RETVAL = 0;
+	  ret = NTInitializationClient(&status);
+	  if(!NTError(ret, status)) {
+	    RETVAL = 1;
+	  }
+	}
+	OUTPUT:
+	RETVAL
+
+int
+ars_NTRegisterClient(user, password, filename)
+	char *		user
+	char *		password
+	char *		filename
+	CODE:
+	{
+	  NTStatusList status;
+	  int ret;
+	  RETVAL = 0;
+	  if(user && password && filename) {
+	    ret = NTRegisterClient(user, password, filename, &status);
+	    if(!NTError(ret, status)) {
+		RETVAL = 1;
+	    }
+	  }
+	}
+	OUTPUT:
+	RETVAL
+
+int
+ars_NTTerminationClient()
+	CODE:
+	{
+	  NTStatusList status;
+	  int ret;
+	  RETVAL = 0;
+	  ret = NTTerminationClient(&status);
+	  if(!NTError(ret, status)) {
+	    RETVAL = 1;
+	  }
+	}
+	OUTPUT:
+	RETVAL
+
+int
+ars_NTRegisterServer(serverHost, user, password)
+	char *		serverHost
+	char *		user
+	char *		password
+	CODE:
+	{
+	  NTStatusList status;
+	  int ret;
+	  RETVAL = 0;
+	  if(serverHost && user && password) {
+	    ret = NTRegisterServer(serverHost, user, password, &status);
+	    if(!NTError(ret, status)) {
+		RETVAL = 1;
+	    }
+	  }
+	}
+	OUTPUT:
+	RETVAL
+
+#else /* ARS3.x */
+
+int 
+ars_NTDeregisterClient(user, password, filename)
+	char *		user
+	char *		password
+	char *		filename
+	CODE:
+	{
+	  RETVAL = 0;
+	  if(user && password && filename)
+		croak("NTDeregisterClient() is only available in ARS2.x");
+	}
+	OUTPUT:
+	RETVAL
+
+int
+ars_NTInitializationClient()
+	CODE:
+	{
+		RETVAL = 0;
+		croak("NTInitializationClient() is only available in ARS2.x");
+
+	}
+	OUTPUT:
+	RETVAL
+
+int
+ars_NTRegisterClient(user, password, filename)
+	char *		user
+	char *		password
+	char *		filename
+	CODE:
+	{
+	 RETVAL = 0;
+	 if(user && password && filename)
+		croak("NTRegisterClient() is only available in ARS2.x");
+	}
+	OUTPUT:
+	RETVAL
+
+int
+ars_NTTerminationClient()
+	CODE:
+	{
+		croak("NTTerminationClient() is only available in ARS2.x");
+		RETVAL = 0;
+	}
+	OUTPUT:
+	RETVAL
+
+int
+ars_NTRegisterServer(serverHost, user, password, clientCommunication=2, clientPort, protocol=1, multipleClients=1)
+	char *		serverHost
+	char *		user
+	char *		password
+	unsigned int	clientCommunication
+	unsigned long	clientPort
+	unsigned int	protocol
+	int		multipleClients
+	CODE:
+	{
+	  NTStatusList status;
+	  int ret;
+	  RETVAL = 0;
+	  if(serverHost && user && password) {
+	    if(clientCommunication == NT_CLIENT_COMMUNICATION_SOCKET) {
+	      if(protocol == NT_PROTOCOL_TCP) {
+		ret = NTRegisterServer(serverHost, user, password, clientCommunication, clientPort, protocol, multipleClients, &status);
+		if(!NTError(ret, status)) {
+		   RETVAL = 1;
+		}
+	      }
+	    }
+	  }
+	}
+	OUTPUT:
+	RETVAL
+
+#endif /* if 2.x or 3.x */
+
+int 
+ars_NTTerminationServer()
+	CODE:
+	{
+	 int ret;
+	 NTStatusList status;
+	 RETVAL = 0;
+	 ret = NTTerminationServer(&status);
+	 if(!NTError(ret, status)) {
+	   RETVAL = 1;
+	 }
+	}
+	OUTPUT:
+	RETVAL
+
+
+int
+ars_NTDeregisterServer(serverHost, user, password)
+	char *		serverHost
+	char *		user
+	char *		password
+	CODE:
+	{
+	 int ret;
+	 NTStatusList status;
+	 RETVAL = 0; /* error */
+	 if(serverHost && user && password) {
+	    ret = NTDeregisterServer(serverHost, user, password, &status);
+	    if(!NTError(ret, status)) {
+		RETVAL = 1; /* success */
+	    }
+	 }
+	}
+	OUTPUT:
+	RETVAL
+
+void
+ars_NTGetListServer()
+	PPCODE:
+	{
+	  NTServerNameList serverList;
+	  NTStatusList status;
+	  int ret,i;
+	  ret = NTGetListServer(&serverList, &status);
+	  if(!NTError(ret, status)) {
+	     for(i=0; i<serverList.numItems; i++) {
+	        XPUSHs(sv_2mortal(newSVpv(serverList.nameList[i], 0)));
+	     }
+#ifndef WASTE_MEM
+	     FreeNTServerNameList(&serverList, FALSE);
+#endif
+	  }
+	}
+
+int
+ars_NTInitializationServer()
+	CODE:
+	{
+	  NTStatusList status;
+	  int ret;
+	  RETVAL = 0; /* error */
+	  ret = NTInitializationServer(&status);
+	  if(!NTError(ret, status)) {
+	     RETVAL = 1; /* success */
+	  }
+	}
+	OUTPUT:
+	RETVAL
+
+int
+ars_NTNotificationServer(serverHost, user, notifyText, notifyCode, notifyCodeText)
+	char *		serverHost
+	char *		user
+	char *		notifyText
+	int		notifyCode
+	char *		notifyCodeText
+	CODE:
+	{
+	  NTStatusList status;
+	  int ret;
+	  RETVAL = 0;
+	  if(serverHost && user && notifyText) {
+	     ret = NTNotificationServer(serverHost, user, notifyText, notifyCode, notifyCodeText, &status);
+	     if(!NTError(ret, status)) {
+		RETVAL = 1;
+	     }
+	  }
+	}
+	OUTPUT:
+	RETVAL
+
+#
+# Destructors for Blessed C structures
+#
+
+MODULE = ARS		PACKAGE = ARControlStructPtr
+
+void
+DESTROY(ctrl)
+	ARControlStruct *	ctrl
+	CODE:
+	{
+#ifndef WASTE_MEM
+	  free(ctrl);
+#endif
+	}
+
+MODULE = ARS		PACKAGE = ARQualifierStructPtr
+
+void
+DESTROY(qual)
+	ARQualifierStruct *	qual
+	CODE:
+	{
+#ifndef WASTE_MEM
+	  FreeARQualifierStruct(qual, 1);
+#endif
+	}
