@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl
 #
-# $Header: /cvsroot/arsperl/ARSperl/Makefile.PL,v 1.72 2005/06/24 14:48:52 jeffmurphy Exp $
+# $Header: /cvsroot/arsperl/ARSperl/Makefile.PL,v 1.58 2004/09/28 14:18:18 jeffmurphy Exp $
 #
 # ARSperl Makefile
 #
@@ -13,7 +13,7 @@
 #    run with "perl Makefile.PL" then type "make"
 #
 
-require 5.005;
+require 5.004;
 use ExtUtils::MakeMaker;
 use Config;
 use Cwd;
@@ -25,13 +25,11 @@ $debug = 0;
 
 # STEP 1 -> Set the path to your ARS API directory
 
-$ARSAPI     = "/usr/ar/api";
-#$ARSAPI     = "/u1/project/ARSperl/api/sol2/api6.0.1";
+#$ARSAPI     = "/usr/ar/api";
+#$ARSAPI     = "/u1/project/ARSperl/api/sol2/api4.5";
 #$ARSAPI     = "/u1/project/ARSperl/api/linux/4.5";
 #$ARSAPI     = "/u1/project/ARSperl/api/linux/4.0";
-#$ARSAPI     = "/u1/project/ARSperl/api/sol2/api6.3";
-$ARSAPI     = "/u1/project/ARSperl/api/linux/6.3";
-#$ARSAPI     = "/u1/project/ARSperl/api/sol2/api6.3";
+$ARSAPI     = "/u1/project/ARSperl/api/linux/5.1.1";
 # $ARSAPI     = "/home/jcmurphy/arsperl/api/5.1";
 # $ARSAPI     = q{\\\\ess7\devkits\ars\4.5\drops\drop4.5FCS\winnt};
 # $ARSAPI     = q{\\\\ess7\devkits\ars\4.5\drops\drop4.5.1FCS\winnt};
@@ -42,14 +40,14 @@ $ARSAPI     = "/u1/project/ARSperl/api/linux/6.3";
 # $ARSAPI     = q{\\\\ess7\devkits\ars\5.1.1\fcs\winnt};
 # $ARSAPI     = q{\\\\ess7\devkits\ars\5.1.2\fcs\winnt};
 # $ARSAPI     = q{\\\\ess7\devkits\ars\6.0\fcs\winnt};
-# $ARSAPI      = q{c:\Progra~1\ARSystem6.0.1\Arserver\Api};
+#$ARSAPI      = q{c:\Progra~1\ARSystem6.0.1\Arserver\Api};
 # $ARSAPI      = q{c:\Program Files\ARSystem6.0.1\Arserver\Api};
 # $ARSAPI      = q{c:\Progra~1\ARSystem6.3\Arserver\Api};
 # $ARSAPI     = q{\\\\ess7\devkits\ars\6.3\current\winnt};
 
 # STEP 2 -> Choose your version of ARS FROM THE FOLLOWING LIST
 #
-#                  2.0 2.1 3.0 3.1 3.2 4.0 4.52 5.0 6.0 6.01 6.3
+#                  2.0 2.1 3.0 3.1 3.2 4.0 4.52 5.0 6.0 6.01
 #
 #           notes
 #            - if there is a maintenace number (e.g. 4.5.2)
@@ -60,7 +58,7 @@ $ARSAPI     = "/u1/project/ARSperl/api/linux/6.3";
 #              your version (e.g. for 4.5 you would specify 4.0, NOT
 #	       4.52)
 #
-$ARSVERSION = 6.3;
+$ARSVERSION = 5.0;
 
 # STEP 3 -> Choose whether or not to enable encryption
 #
@@ -93,55 +91,17 @@ $WINDOWS = ($^O eq 'MSWin32');
 #        NCR UNIX: add "-lc -lnet"
 #                -DARSPDEBUG
 $AUTODEFINES = " -g ";
-$AUTODEFINES = " -D_WIN32 " if($WINDOWS);
-$AUTODEFINES .= "  -Wno-unused-variable -Wuninitialized " if $Config{'cc'} eq "gcc";
+$AUTODEFINES = "-D_WIN32" if($WINDOWS);
 
 
-$ARS_STATIC_LIB = "";
-
-$PM = {};
-foreach my $pm2install (qw{ARSarerrno-h.pm  ARSar-h.pm  ARSnparm.pm  ARSnterrno-h.pm  ARSnt-h.pm  ARSOOform.pm  ARSOOmsgs.pm  ARSOOsup.pm  ARS.pm}) {
-	$PM->{$pm2install} = '$(INST_LIBDIR)/'.$pm2install;
-}
-
-if ($ARSVERSION >= 6.3) {
-        $ARS_STATIC_LIB = $ARSAPI."/lib/libar.a";
-	$ARS_LIBS = "";
-	$PM->{'artypes.ph'} = '$(INST_LIBDIR)/artypes.ph';
-	if ($WINDOWS) {
-		    $ARS_LIBS = join(' ', map { '-l' . $_ } @{$ra_arlibs});
-	} else {
-		    $ARS_LIBS .= " -lpthread";
-	}
-	$AUTODEFINES .= " -DARS32 ";
-	$AUTODEFINES .= " -DARS452 " if($ARSVERSION >= 4.52);
-	if ( ($ARSVERSION >= 5.0) && ($^O eq 'linux') ) {
-		$AUTODEFINES .= " -malign-double ";
-	}
-}
-
-elsif ($ARSVERSION >= 6.0) {
-  $ARS_LIBS = "-lar -lnsl";
+if ($ARSVERSION >= 6.0) {
+  $ARS_LIBS = "-lar";
   if ($WINDOWS) {
     $ARS_LIBS = join(' ', map { '-l' . $_ } @{$ra_arlibs});
   } else {
     $ARS_LIBS .= " -lpthread";
   }
   $AUTODEFINES .= " -DARS32 ";	
-  $AUTODEFINES .= " -DARS452 " if($ARSVERSION >= 4.52);
-  if ( ($ARSVERSION >= 5.0) && ($^O eq 'linux') ) {
-    $AUTODEFINES .= " -malign-double ";
-  }
-}
-
-elsif($ARSVERSION >= 5.0) {
- $ARS_LIBS = "-lar -lnsl";
-  if($ENCRYPT == 1) {
-    $ARS_LIBS = "-lar -larencrypt -lnsl";
-  }
-  $ARS_LIBS .= " -lnts" unless ($ARSVERSION >= 5.0);
-  $ARS_LIBS .= " -lpthread" unless $WINDOWS;
-  $AUTODEFINES .= " -DARS32 ";
   $AUTODEFINES .= " -DARS452 " if($ARSVERSION >= 4.52);
   if ( ($ARSVERSION >= 5.0) && ($^O eq 'linux') ) {
     $AUTODEFINES .= " -malign-double ";
@@ -223,15 +183,8 @@ foreach ("ar", "arerrno", "nt", "nterrno") {
 # are retired. so this file is just stubbed.
 1;\n";
 		close(FD);
-		open (FD, "> artypes.ph") || die "open: $!";
-		print FD "\# hackaround for artypes.h. do not remove.\n1;\n";
-		close(FD);
 		next;
 	}
-
-	# arsystem <= 6.0.3 doesnt have artypes.h
-
-	next if ( ($ARSVERSION < 6.03) && /^artypes$/ );
 
 	die "couldn't find $headerFile" if (! -e $headerFile);
 
@@ -240,11 +193,7 @@ foreach ("ar", "arerrno", "nt", "nterrno") {
 	# -d should make it create _h2ph_pre in the current 
 	# directory incase you never ran h2ph before (as root)
 
-	if ($_ eq "artypes") {
-		$rv = system("$Config{'perlpath'} infra/h2ph -d . < $headerFile > ${_}.ph");
-	} else {
-		$rv = system("$Config{'perlpath'} infra/h2ph -d . < $headerFile > ARS${_}-h.pm");
-	}
+	$rv = system("$Config{'perlpath'} infra/h2ph -d . < $headerFile > ARS${_}-h.pm");
 
 	unlink ('_h2ph_pre.ph');
 	open (FD, "> _h2ph_pre.ph") || die "open: $!";
@@ -266,21 +215,13 @@ printf "\tARSVERSION  = %.2f\n", $ARSVERSION;
 print "\tARSAPI      = $ARSAPI\n";
 print "\tAUTODEFINES = $AUTODEFINES\n";
 
-$PM->{'_h2ph_pre.ph'} = '$(INST_LIBDIR)/_h2ph_pre.ph';
-
 WriteMakefile(
 	      'NAME'	=> 'ARS',
 	      'VERSION_FROM' => 'ARS.pm',
 	      'LIBS'	=> ["${ARS_LDPATH} ${ARS_LIBS}"],
-	      'OBJECT'  => q[ARS$(OBJ_EXT) support$(OBJ_EXT) supportrev$(OBJ_EXT) ].$ARS_STATIC_LIB,
+	      'OBJECT'  => q[ARS$(OBJ_EXT) support$(OBJ_EXT) supportrev$(OBJ_EXT)],
 	      'INC'	=> "${INCLUDES}",
-	
-	      'PM' => $PM,
-
-	      ($] >= 5.005 ?    ## Add these new keywords supported since 5.005
-               (ABSTRACT      => 'ARSperl is an integration kit for Perl5 and the Remedy Action Request System.',
-                AUTHOR        => 'ARSPerl Dev Group <arsperl-devel@arsperl.org>') : ()),
-
+	      'PM' =>{ '_h2ph_pre.ph' => '$(INST_LIBDIR)/_h2ph_pre.ph' },
 	      @extras,
 
 # DEFINE OPTIONS:
@@ -325,7 +266,7 @@ WriteMakefile(
 # don't fiddle with this
 
               'realclean' => {
-		 'FILES' => 'support.h ARSar-h.pm ARSarerrno-h.pm ARSnt-h.pm ARSnterrno-h.pm t/config.cache serverTypeInfoHints.h *~ .purify *-h.pm _h2ph_pre.ph artypes.ph ' 
+		 'FILES' => 'support.h ARSar-h.pm ARSarerrno-h.pm ARSnt-h.pm ARSnterrno-h.pm t/config.cache serverTypeInfoHints.h *~ .purify *-h.pm _h2ph_pre.ph ' 
 	      } 
 );
 
@@ -379,41 +320,6 @@ sub GenerateSupportDotH {
 		print FD "  { $code, \t\t\"\L$1\E\" },\n";
 	    }
 	} 
-	elsif(/CHARMENUDDTYPEMAP/) {
-	    print "\tProcessing AR_CHAR_MENU_DD type codes..\n";
-	    my($code, $line);
-	    foreach $line (grep (/^\#define\s+AR_CHAR_MENU_DD_.*/, @arh)) {
-		$code = (split(/\s/, $line))[1];
-		print "\t\t$code\n" if $debug;
-		$code =~ /^AR_CHAR_MENU_(\w+)/;
-		last if ($1 eq "DD_DB_NAME");
-		print FD "  { $code, \t\t\"\L$1\E\" },\n";
-	    }
-	}
-	elsif(/CHARMENUDDNAMEMAP/) {
-	    print "\tProcessing AR_CHAR_MENU_DD name codes..\n";
-	    my($code, $line);
-	    foreach $line (grep (/^\#define\s+AR_CHAR_MENU_DD_.*/, @arh)) {
-		$code = (split(/\s/, $line))[1];
-		print "\t\t$code\n" if $debug;
-		$code =~ /^AR_CHAR_MENU_(\w+)/;
-		next if ($1 eq "DD_NONE");
-		next if ($1 eq "DD_FORM");
-		next if ($1 eq "DD_FIELD");
-		last if ($1 eq "DD_FORMAT_NONE");
-		print FD "  { $code, \t\t\"\L$1\E\" },\n";
-	    }
-	}
-	elsif(/CHARMENUDDVALUEMAP/) {
-	    print "\tProcessing AR_CHAR_MENU_DD value format..\n";
-	    my($code, $line);
-	    foreach $line (grep (/^\#define\s+AR_CHAR_MENU_DD_FORMAT_.*/, @arh)) {
-		$code = (split(/\s/, $line))[1];
-		print "\t\t$code\n" if $debug;
-		$code =~ /^AR_CHAR_MENU_(\w+)/;
-		print FD "  { $code, \t\t\"\L$1\E\" },\n";
-	    }
-	}
 	elsif(/CHARMENUTYPEMAP/) {
 	    print "\tProcessing AR_CHAR_MENU codes..\n";
 	    my($code, $line);
@@ -421,7 +327,6 @@ sub GenerateSupportDotH {
 		$code = (split(/\s/, $line))[1];
 		print "\t\t$code\n" if $debug;
 		$code =~ /^AR_CHAR_MENU_(\w+)/;
-		next if ($1 =~ m/^DD_/);
 		print FD "  { $code, \t\t\"\L$1\E\" },\n";
 	    }
 	}
@@ -555,42 +460,6 @@ sub GenerateSupportDotH {
 		print FD "  { $code, \t\t\"\L$1\E\" },\n";
 	    }
 	}
-	elsif(/CONTAINERTYPEMAP/) {
-	    print "\tProcessing ARCON codes..\n";
-	    my($code, $line);
-	    foreach $line (grep (/^\#define\s+ARCON.*/, @arh)) {
-		$code = (split(/\s/, $line))[1];
-
-		print "\t\t$code\n" if $debug;
-		$code =~ /^ARCON_(\w+)/;
-		last if ($1 eq "LAST_RESERVED");
-		print FD "  { $code, \t\t\"\L$1\E\" },\n";
-	    }
-	}
-	elsif(/CONTAINEROWNERMAP/) {
-	    print "\tProcessing ARCONOWNER codes..\n";
-	    my($code, $line);
-	    foreach $line (grep (/^\#define\s+ARCONOWNER.*/, @arh)) {
-		$code = (split(/\s/, $line))[1];
-
-		print "\t\t$code\n" if $debug;
-		$code =~ /^ARCONOWNER_(\w+)/;
-		print FD "  { $code, \t\t\"\L$1\E\" },\n";
-	    }
-	}
-	elsif(/REFERENCETYPEMAP/) {
-	    print "\tProcessing ARREF codes..\n";
-	    my($code, $line);
-	    foreach $line (grep (/^\#define\s+ARREF.*/, @arh)) {
-		$code = (split(/\s/, $line))[1];
-
-		print "\t\t$code\n" if $debug;
-		$code =~ /^ARREF_(\w+)/;
-		next if ($1 eq "LAST_SERVER_OBJ");
-		last if ($1 eq "LAST_RESERVED");
-		print FD "  { $code, \t\t\"\L$1\E\" },\n";
-	    }
-	}
 	elsif(/KEYWORDMAP/) {
 	    print "\tProcessing AR_KEYWORD codes..\n";
 	    my($code, $line);
@@ -615,18 +484,6 @@ sub GenerateSupportDotH {
 		print FD "  { $code, \t\"$1\" },\n";
 	    }
 	}
-	elsif(/DDEACTIONMAP/) {
-	    print "\tProcessing AR_DDE codes..\n";
-	    my($code, $line);
-	    foreach $line (grep (/^\#define\s+AR_DDE.*/, @arh))
-            {
-		$code = (split(/\s/, $line))[1];
-
-		print "\t\t$code\n" if $debug;
-		$code =~ /^AR_DDE_(\w+)/;
-		print FD "  { $code, \t\"\L$1\E\" },\n";
-	    }
-	}
 	elsif(/ACTIVELINKACTIONTYPEMAP/) {
 	    print "\tProcessing AR_ACTIVE_LINK_ACTION codes..\n";
 	    my($code, $line);
@@ -634,18 +491,6 @@ sub GenerateSupportDotH {
             {
 		$code = (split(/\s/, $line))[1];
 
-		print "\t\t$code\n" if $debug;
-		$code =~ /^AR_ACTIVE_LINK_ACTION_(\w+)/;
-		last if ($1 eq "OPEN_DLG");
-		print FD "  { $code, \t\"\L$1\E\" },\n";
-	    }
-	}
-	elsif(/OPENWINDOWMODEMAP/) {
-	    print "\tProcessing AR_ACTIVE_LINK_ACTION_OPEN codes..\n";
-	    my($code, $line);
-	    foreach $line (grep (/^\#define\s+AR_ACTIVE_LINK_ACTION_OPEN_.*/, @arh))
-            {
-		$code = (split(/\s/, $line))[1];
 		print "\t\t$code\n" if $debug;
 		$code =~ /^AR_ACTIVE_LINK_ACTION_(\w+)/;
 		print FD "  { $code, \t\"\L$1\E\" },\n";
@@ -767,7 +612,7 @@ sub findAPIVersion {
   my $path_to_api_dir = shift;
 
   my $ar_fname = join('/', $path_to_api_dir, 'include', 'ar.h');
-  open ($ar_fh, '<'. $ar_fname) or
+  open ($ar_fh, '<', $ar_fname) or
     die "couldn't open ar.h include file from: \"$ar_fname\": $!\n";
 
   my $api_version = undef;

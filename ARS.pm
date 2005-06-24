@@ -56,7 +56,7 @@ sub FETCH {
 
 package ARS;
 
-require 5.004;
+require 5.005;
 use strict "vars";
 require Exporter;
 require DynaLoader;
@@ -101,12 +101,12 @@ ars_GetServerInfo ars_SetServerInfo
 ars_GetEntryBLOB
 ars_CreateActiveLink ars_CreateAdminExtension
 ars_GetControlStructFields ars_GetVUI
-ars_GetListContainer ars_SetServerPort
+ars_GetListContainer ars_GetContainer ars_SetServerPort
 $ars_errstr %ARServerStats %ars_errhash
 ars_decodeStatusHistory ars_APIVersion
 );
 
-$ARS::VERSION   = '1.82';
+$ARS::VERSION   = '1.84';
 $ARS::DEBUGGING = 0;
 
 # definitions required for backwards compatibility
@@ -436,7 +436,6 @@ sub ars_GetCharMenuItems {
 		}
 		return ars_ExpandCharMenu2($ctrl, $menuName, $qual);
 	}
-	print "calling ECM2\n";
 	return ars_ExpandCharMenu2($ctrl, $menuName);
 }
 
