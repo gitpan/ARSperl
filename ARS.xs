@@ -1,5 +1,5 @@
 /*
-$Header: /cvsroot/arsperl/ARSperl/ARS.xs,v 1.105 2005/05/23 12:11:36 idtrimnell Exp $
+$Header: /cvsroot/arsperl/ARSperl/ARS.xs,v 1.109 2005/09/19 14:40:30 jeffmurphy Exp $
 
     ARSperl - An ARS v2 - v5 / Perl5 Integration Kit
 
@@ -1077,7 +1077,11 @@ ars_GetListContainer(ctrl,changedSince=0,attributes=0,...)
 		(void) ARError_add( AR_RETURN_ERROR, AP_ERR_BAD_ARGS);
 	  else {
 	  	ARContainerTypeList	containerTypes;
-		int			count, clist[ARCON_LAST_RESERVED];
+		int			count;
+# if AR_EXPORT_VERSION <= 4L
+		unsigned
+# endif
+		int clist[ARCON_LAST_RESERVED];
 # if AR_EXPORT_VERSION >= 6
 		ARContainerOwnerObjList ownerObjList;
 # else
@@ -1117,19 +1121,30 @@ ars_GetListContainer(ctrl,changedSince=0,attributes=0,...)
 		if(!ARError(ret, status)) {
 		    for(i = 0 ; i < conList.numItems ; i++) {
 	        	HV 			*conInfo = newHV();
+# if AR_EXPORT_VERSION >= 6
 			ARContainerOwnerObjList	 cOwnerObjList;
+# endif
 
 	        	hv_store(conInfo,  "containerType", strlen("containerType") , 
 				newSVpv(ContainerTypeMap[conList.conInfoList[i].type].name, 0), 0);
 	        	hv_store(conInfo,  "containerName", strlen("containerName") , 
 				newSVpv(conList.conInfoList[i].name, 0), 0);
+# if AR_EXPORT_VERSION >= 6
 			cOwnerObjList = conList.conInfoList[i].ownerList;
 			hv_store(conInfo,  "ownerObjList", strlen("ownerObjList") ,
 		     		perl_AROwnerObjList(ctrl, &cOwnerObjList), 0);
+# else
+			hv_store(conInfo,  "ownerType", strlen("ownerType") ,
+		     		newSViv(conList.conInfoList[i].ownerType), 0);
+			hv_store(conInfo,  "ownerName", strlen("ownerName") ,
+		     		newSVpv(conList.conInfoList[i].ownerName,0), 0);
+# endif
 	        	XPUSHs(sv_2mortal(newRV_noinc((SV *)conInfo)));
 		    }
 		}
+# if AR_EXPORT_VERSION >= 5L
 		FreeARContainerTypeList(&containerTypes, FALSE);
+# endif
 		FreeARContainerInfoList(&conList, FALSE);
 # if AR_EXPORT_VERSION >= 6
 		FreeARContainerOwnerObjList(&ownerObjList, FALSE);
@@ -1153,18 +1168,33 @@ ars_GetContainer(control,name)
 	  ARReferenceTypeList     refTypes;
 	  ARPermissionList        groupList;
 	  ARInternalIdList        adminGroupList;
+# if AR_EXPORT_VERSION >= 6
 	  ARContainerOwnerObjList ownerObjList;
+# else
+	  ARContainerOwnerObj     ownerObj;
+# endif
 	  char                   *label = CPNULL;
 	  char                   *description = CPNULL;
 	  unsigned int            type;
 	  ARReferenceList         references;
 	  char                   *helpText = CPNULL;
+# if AR_EXPORT_VERSION >= 6
 	  ARAccessNameType        owner;
+# else
+	  ARNameType              owner;
+# endif
 	  ARTimestamp             timestamp;
+# if AR_EXPORT_VERSION >= 6
 	  ARAccessNameType        lastChanged;
+# else
+	  ARNameType              lastChanged;
+# endif
 	  char                   *changeDiary = CPNULL;
 	  ARPropList              objPropList;
-	  unsigned int            tlist[] = {ARREF_ALL};
+# if AR_EXPORT_VERSION <= 4L
+	  unsigned 
+# endif
+		int            tlist[] = {ARREF_ALL};
 	  int                     i;
 	  ARDiaryList             diaryList;
 
@@ -1176,10 +1206,18 @@ ars_GetContainer(control,name)
 
 	  ret = ARGetContainer(control, name, &refTypes, 
 			       &groupList, &adminGroupList,
-			       &ownerObjList, &label, &description,
+# if AR_EXPORT_VERSION >= 6
+			       &ownerObjList, 
+# else
+			       &ownerObj, 
+# endif
+			       &label, &description,
 			       &type, &references, &helpText,
 			       owner, &timestamp, lastChanged, &changeDiary, 
-			       &objPropList, &status);
+# if AR_EXPORT_VERSION >= 5L
+			       &objPropList, 
+# endif
+				&status);
 #ifdef PROFILE
 	  ((ars_ctrl *)control)->queries++;
 #endif
@@ -1195,8 +1233,13 @@ ars_GetContainer(control,name)
 		     perl_ARList(control, (ARList *)&adminGroupList, 
 				 (ARS_fn)perl_ARInternalId,
 				 sizeof(ARInternalId)),0);
+# if AR_EXPORT_VERSION >= 6
 	    hv_store(RETVAL,  "ownerObjList", strlen("ownerObjList") ,
 		     perl_AROwnerObjList(control, &ownerObjList), 0);
+# else
+	    hv_store(RETVAL,  "ownerObj", strlen("ownerObj") ,
+		     perl_AROwnerObj(control, &ownerObj), 0);
+# endif
 	    if (helpText)
 	      hv_store(RETVAL,  "helpText", strlen("helpText") , newSVpv(helpText, 0), 0);
 	    hv_store(RETVAL,  "timestamp", strlen("timestamp") , newSViv(timestamp), 0);
@@ -1227,7 +1270,9 @@ ars_GetContainer(control,name)
 
 	    FreeARPermissionList(&groupList,FALSE);
 	    FreeARInternalIdList(&adminGroupList,FALSE);
+# if AR_EXPORT_VERSION >= 6
 	    FreeARContainerOwnerObjList(&ownerObjList,FALSE);
+# endif
 	    FreeARReferenceList(&references,FALSE);
 	    FreeARPropList(&objPropList, FALSE);
 	    if(helpText)
@@ -1804,6 +1849,7 @@ ars_GetCharMenu(ctrl,name)
 			hv_store(RETVAL,  "menuSQL", strlen("menuSQL") , 
 				newRV_noinc((SV *)menuDef), 0);
 			break;
+# if AR_EXPORT_VERSION >= 6
 		case AR_CHAR_MENU_DATA_DICTIONARY:
 			hv_store(menuDef,  "server", strlen("server") , 
 				newSVpv(menuDefn.u.menuDD.server, 0), 0);
@@ -1834,6 +1880,7 @@ ars_GetCharMenu(ctrl,name)
 			hv_store(RETVAL,  "menuDD", strlen("menuDD") , 
 				newRV_noinc((SV *)menuDef), 0);
 			break;
+# endif
 #endif
 		}
 #if AR_EXPORT_VERSION >= 5
@@ -2019,8 +2066,10 @@ ars_GetSchema(ctrl,name)
 			perl_ARCompoundSchema(ctrl, &schema), 0);
 	    hv_store(RETVAL,  "sortList", strlen("sortList") , 
 			perl_ARSortList(ctrl, &sortList), 0);
+#if AR_EXPORT_VERSION >= 8L
 	    hv_store(RETVAL,  "archiveInfo", strlen("archiveInfo") , 
 			perl_ARArchiveInfoStruct(ctrl, &infoStruct), 0);
+#endif
 #endif
 #if AR_EXPORT_VERSION >= 3
 	    FreeARPermissionList(&groupList,FALSE);
@@ -3384,11 +3433,12 @@ ars_GetListVUI(ctrl, schema, changedSince=0)
 	  ARStatusList     status;
 	  ARInternalIdList idList;
 	  int              ret = 0;
-          unsigned int     i = 0;
+      unsigned int     i = 0;
 
-	  ret = ARGetListVUI(ctrl, schema, changedSince, &idList, &status);
 	  Zero(&status, 1,ARStatusList);
 	  Zero(&idList, 1, ARInternalIdList);
+
+	  ret = ARGetListVUI(ctrl, schema, changedSince, &idList, &status);
 #ifdef PROFILE
 	  ((ars_ctrl *)ctrl)->queries++;
 #endif
@@ -4222,6 +4272,69 @@ ars_GetListEntryWithFields(ctrl,schema,qualifier,maxRetrieve=0,firstRetrieve=0,.
 	}
 
 
+void
+ars_SetLogging( ctrl, logTypeMask, ...)
+	ARControlStruct *	ctrl
+	unsigned long           logTypeMask
+	PPCODE:
+	{
+#if AR_EXPORT_VERSION >= 5
+		ARStatusList     status;
+		unsigned long    whereToWriteMask = AR_WRITE_TO_STATUS_LIST;
+		int	         ret;
+		FILE            *logFilePtr;
+
+		(void) ARError_reset();
+		Zero(&status, 1, ARStatusList);
+
+		logFilePtr = get_logging_file_ptr();
+		/* printf( "GET logging_file_ptr = %p\n", logFilePtr ); */
+
+		if( items > 2 && logTypeMask != 0 ){
+			char *fileName;
+			int len;
+			fileName = SvPV(ST(2),len);
+
+			if( logFilePtr != NULL ){
+				fclose( logFilePtr );
+				logFilePtr = NULL;
+			}
+
+			whereToWriteMask = AR_WRITE_TO_FILE;
+			logFilePtr = fopen( fileName, "a" );
+
+			if( logFilePtr == NULL ){
+				char buf[2048];
+				sprintf( buf, "Cannot open file: %s", fileName );
+				(void) ARError_add( AR_RETURN_ERROR, AP_ERR_INV_ARGS, buf);
+				XPUSHs(sv_2mortal(newSViv(0))); /* ERR */
+				goto SetLogging_fail;
+			}
+			set_logging_file_ptr( logFilePtr );
+			/* printf( "GET logging_file_ptr = %p\n", logFilePtr ); */
+		}
+
+		ret = ARSetLogging( ctrl, logTypeMask, whereToWriteMask, logFilePtr, &status );
+
+		if( logTypeMask == 0 && logFilePtr != NULL ){
+			fclose( logFilePtr );
+			set_logging_file_ptr( NULL );
+		}
+
+		if(ARError(ret, status)) {
+			XPUSHs(sv_2mortal(newSViv(0))); /* ERR */
+		} else {
+			XPUSHs(sv_2mortal(newSViv(1))); /* OK */
+		}
+	SetLogging_fail:;
+#else /* < 4.5 */
+	  XPUSHs(sv_2mortal(newSViv(0))); /* ERR */
+	  (void) ARError_add( AR_RETURN_ERROR, AP_ERR_DEPRECATED, 
+			"SetLogging() is only available in ARSystem >= 4.5");
+#endif
+	}
+
+
 
 ###################################################
 # ALERT ROUTINES. as of 5.x, these replace the 
@@ -4370,7 +4483,9 @@ ars_DecodeAlertMessage(ctrl,message,messageLen)
 					&alertText,
 					&sourceTag,
 					&serverName,
+#if AR_EXPORT_VERSION >= 7L
 					&serverAddr,
+#endif
 					&formName,
 					&objId,
 					&status);

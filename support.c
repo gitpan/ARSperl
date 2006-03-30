@@ -98,6 +98,29 @@ debug_free(void *p, char *file, char *func, int line)
 	free(p);
 }
 
+
+FILE* 
+get_logging_file_ptr()
+{
+	SV  *file_ptr;
+	file_ptr = get_sv( "ARS::logging_file_ptr", FALSE );
+	if( file_ptr != NULL ){
+		return (FILE*) SvIV(file_ptr);
+	}else{
+		return NULL;
+	}
+}
+
+
+void
+set_logging_file_ptr( FILE* ptr )
+{
+	SV  *file_ptr;
+	file_ptr = get_sv( "ARS::logging_file_ptr", TRUE );
+	sv_setiv( file_ptr, (int)ptr );
+}
+
+
 /* ROUTINE
  *   ARError_add(type, num, text)
  *   ARError_reset()
@@ -842,11 +865,13 @@ perl_ARValueStruct_Assign(ARControlStruct * ctrl, ARValueStruct * in)
 				   (ARS_fn) perl_ARCoordStruct,
 				   sizeof(ARCoordStruct));
 #endif
-#if AR_EXPORT_VERSION >= 4
+#if AR_EXPORT_VERSION >= 7L
 	case AR_DATA_TYPE_TIME_OF_DAY:
 		return newSViv(in->u.timeOfDayVal);
 	case AR_DATA_TYPE_DATE:
 		return newSViv(in->u.dateVal);
+#endif
+#if AR_EXPORT_VERSION >= 4
 	case AR_DATA_TYPE_ATTACH:
 		return perl_ARAttach(ctrl, in->u.attachVal);
         case AR_DATA_TYPE_DECIMAL:
@@ -923,6 +948,8 @@ perl_ARValueStruct(ARControlStruct * ctrl, ARValueStruct * in)
 		return perl_ARAttach(ctrl, in->u.attachVal);
         case AR_DATA_TYPE_DECIMAL:
 		return newSVpv(in->u.decimalVal, 0);
+#endif
+#if AR_EXPORT_VERSION >= 7L
 	case AR_DATA_TYPE_TIME_OF_DAY:
 		return newSViv(in->u.timeOfDayVal);
         case AR_DATA_TYPE_DATE:
@@ -1068,6 +1095,7 @@ perl_AROpenDlgStruct(ARControlStruct * ctrl, AROpenDlgStruct * in)
 			     (ARList *)& in->outputValueFieldPairs,
 			     (ARS_fn) perl_ARFieldAssignStruct,
 			     sizeof(ARFieldAssignStruct)), 0);
+#if AR_EXPORT_VERSION >= 6
 	hv_store(hash,  "windowMode", strlen("windowMode") ,
 		 newSVpv(lookUpTypeName((TypeMapStruct *)OpenWindowModeMap, 
 					in->windowMode), 0), 0); /* One of AR_ACTIVE_LINK_ACTION_OPEN_ */
@@ -1096,6 +1124,7 @@ perl_AROpenDlgStruct(ARControlStruct * ctrl, AROpenDlgStruct * in)
 		 newSVpv(in->reportString, 0), 0);
 	hv_store(hash,  "sortOrderList", strlen("sortOrderList") , 
 		 perl_ARSortList(ctrl, &(in->sortOrderList)), 0);
+#endif
 
 	return newRV_noinc((SV *)hash);
 }
@@ -1109,8 +1138,11 @@ perl_ARCallGuideStruct(ARControlStruct * ctrl, ARCallGuideStruct * in)
 	hv_store(hash, "guideName", strlen("guideName") ,
 		 newSVpv(in->guideName, 0), 0);
 	hv_store(hash, "guideMode", strlen("guideMode") , newSViv(in->guideMode), 0);
+#if AR_EXPORT_VERSION >= 6L
 	hv_store(hash, "loopTable", strlen("loopTable"),
 		 perl_ARInternalId(ctrl, &(in->guideTableId)), 0);
+#endif
+#if AR_EXPORT_VERSION >= 8L
 	hv_store(hash,  "inputValueFieldPairs", strlen("inputValueFieldPairs") ,
 		 perl_ARList(ctrl,
 			     (ARList *)& in->inputValueFieldPairs,
@@ -1125,6 +1157,7 @@ perl_ARCallGuideStruct(ARControlStruct * ctrl, ARCallGuideStruct * in)
 		 newSVpv(in->sampleServer, 0), 0);
 	hv_store(hash, "sampleGuide", strlen("sampleGuide") ,
 		 newSVpv(in->sampleGuide, 0), 0);
+#endif
 	return newRV_noinc((SV *)hash);
 }
 
@@ -1145,12 +1178,17 @@ SV             *
 perl_ARCloseWndStruct(ARControlStruct * ctrl, ARCloseWndStruct * in)
 {
 	HV          *hash = newHV();
+#if AR_EXPORT_VERSION >= 6L
 	if(in->closeAll)
 		hv_store(hash,  "closeAll", strlen("closeAll") ,
 			 newSVpv("true", 0), 0);
 	else 
 		hv_store(hash,  "closeAll", strlen("closeAll") ,
 			 newSVpv("false", 0), 0);
+#else
+	hv_store(hash,  "schemaName", strlen("schemaName") ,
+		 newSVpv(in->schemaName, 0), 0);
+#endif
 	return newRV_noinc((SV *)hash);
 }
 
@@ -1385,7 +1423,9 @@ perl_ARFieldCharacteristics(ARControlStruct * ctrl, ARFieldCharacteristics * in)
 {
 	HV             *hash = newHV();
 
+#if AR_EXPORT_VERSION >= 8L
 	hv_store(hash,  "option", strlen("option") , newSViv(in->option), 0);
+#endif
 	hv_store(hash,  "accessOption", strlen("accessOption") , newSViv(in->accessOption), 0);
 	hv_store(hash,  "focus", strlen("focus") , newSViv(in->focus), 0);
 #if AR_EXPORT_VERSION < 3
@@ -1676,6 +1716,7 @@ perl_ARFilterActionStruct(ARControlStruct * ctrl, ARFilterActionStruct * in)
 		hv_store(hash,  "gotoAction", strlen("gotoAction") ,
 			 perl_ARGotoActionStruct(ctrl, &in->u.gotoAction), 0);
                 break;
+# if AR_EXPORT_VERSION >= 6L
         case AR_FILTER_ACTION_CALLGUIDE:
                 /*ARCallGuideStruct;*/
 		hv_store(hash,  "callGuide", strlen("callGuide") ,
@@ -1691,7 +1732,7 @@ perl_ARFilterActionStruct(ARControlStruct * ctrl, ARFilterActionStruct * in)
 		hv_store(hash,  "gotoGuide", strlen("gotoGuide") ,
 			 newSVpv(in->u.gotoGuide.label, 0), 0);
                 break;
- 
+# endif 
 #endif
 	case AR_FILTER_ACTION_NONE:
 	default:
@@ -1952,8 +1993,16 @@ perl_ARFieldLimitStruct(ARControlStruct * ctrl, ARFieldLimitStruct * in)
 
 #if AR_EXPORT_VERSION >= 7
 	case AR_DATA_TYPE_CURRENCY:
+		hv_store(hash,  "rangeLow", strlen("rangeLow") , newSVpv(in->u.currencyLimits.rangeLow, 0), 0);
+		hv_store(hash,  "rangeHigh", strlen("rangeHigh") , newSVpv(in->u.currencyLimits.rangeHigh, 0), 0);
+		hv_store(hash,  "precision", strlen("precision") , newSViv(in->u.currencyLimits.precision), 0);
+		hv_store(hash,  "functionalCurrencies", strlen("functionalCurrencies"), perl_ARCurrencyDetailList(ctrl,&(in->u.currencyLimits.functionalCurrencies)), 0 );
+		hv_store(hash,  "allowableCurrencies",  strlen("allowableCurrencies"),  perl_ARCurrencyDetailList(ctrl,&(in->u.currencyLimits.allowableCurrencies)), 0 );
+		return newRV_noinc((SV *) hash);
 	case AR_DATA_TYPE_DATE:
+		return &PL_sv_undef;
 	case AR_DATA_TYPE_TIME_OF_DAY:
+		return &PL_sv_undef;
 #endif
 
 	case AR_DATA_TYPE_TABLE:
@@ -1962,17 +2011,22 @@ perl_ARFieldLimitStruct(ARControlStruct * ctrl, ARFieldLimitStruct * in)
 		hv_store(hash,  "maxRetrieve", strlen("maxRetrieve") , newSViv(in->u.tableLimits.maxRetrieve), 0);
 		hv_store(hash,  "schema", strlen("schema") , newSVpv(in->u.tableLimits.schema, 0), 0);
 		hv_store(hash,  "server", strlen("server") , newSVpv(in->u.tableLimits.server, 0), 0);
+#if AR_EXPORT_VERSION >= 8L
 		hv_store(hash,  "sampleSchema", strlen("sampleSchema") , newSVpv(in->u.tableLimits.sampleSchema, 0), 0);
 		hv_store(hash,  "sampleServer", strlen("sampleServer") , newSVpv(in->u.tableLimits.sampleServer, 0), 0);
+#endif
 		return newRV_noinc((SV *) hash);
 
 	case AR_DATA_TYPE_COLUMN:
 		hv_store(hash, "parent", strlen("parent"), perl_ARInternalId(ctrl, &(in->u.columnLimits.parent)), 0);
 		hv_store(hash, "dataField", strlen("dataField"), perl_ARInternalId(ctrl, &(in->u.columnLimits.dataField)), 0);
+#if AR_EXPORT_VERSION >= 6L
 		hv_store(hash,  "dataSource", strlen("dataSource") , newSViv(in->u.columnLimits.dataSource), 0);
+#endif
 		hv_store(hash,  "colLength", strlen("colLength") , newSViv(in->u.columnLimits.colLength), 0);
 		return newRV_noinc((SV *) hash);
 
+#if AR_EXPORT_VERSION >= 6L
 	case AR_DATA_TYPE_VIEW:
 		hv_store(hash,  "maxLength", strlen("maxLength") , newSViv(in->u.viewLimits.maxLength), 0);
 		return newRV_noinc((SV *) hash);
@@ -1980,6 +2034,7 @@ perl_ARFieldLimitStruct(ARControlStruct * ctrl, ARFieldLimitStruct * in)
 	case AR_DATA_TYPE_DISPLAY:
 		hv_store(hash,  "maxLength", strlen("maxLength") , newSViv(in->u.displayLimits.maxLength), 0);
 		return newRV_noinc((SV *) hash);
+#endif
 
 	case AR_DATA_TYPE_NULL:
 	default:
@@ -2042,6 +2097,8 @@ perl_ARAssignStruct(ARControlStruct * ctrl, ARAssignStruct * in)
 	case AR_ASSIGN_TYPE_SQL:
 		hv_store(hash,  "sql", strlen("sql") , perl_ARAssignSQLStruct(ctrl, in->u.sql), 0);
 		break;
+#endif
+#if AR_EXPORT_VERSION >= 6L
 	case AR_ASSIGN_TYPE_FILTER_API:
 		hv_store(hash,  "filterApi", strlen("filterApi") , perl_ARAssignFilterApiStruct(ctrl, in->u.filterApi), 0);
 		break;
@@ -2111,6 +2168,8 @@ perl_ARAssignSQLStruct(ARControlStruct * ctrl, ARAssignSQLStruct * in)
 	return newRV_noinc((SV *) hash);
 }
 
+#endif /* ARS3.x */
+#if AR_EXPORT_VERSION >= 6
 SV             *
 perl_ARAssignFilterApiStruct(ARControlStruct * ctrl, ARAssignFilterApiStruct * in)
 {
@@ -2124,7 +2183,7 @@ perl_ARAssignFilterApiStruct(ARControlStruct * ctrl, ARAssignFilterApiStruct * i
 
 	return newRV_noinc((SV *) hash);
 }
-#endif				/* ARS3.x */
+#endif				
 
 SV             *
 perl_ARFunctionAssignStruct(ARControlStruct * ctrl, ARFunctionAssignStruct * in)
@@ -2222,7 +2281,7 @@ my_strtok(char *str, char *tok, int tlen, char sep)
 
 	/* str is NULL, we're done */
 
-	if (!str && !*str)
+	if ( !str )
 		return NULL;
 
 	for (i = 0; i < tlen; i++)
@@ -2267,12 +2326,13 @@ perl_BuildEntryList(ARControlStruct * ctrl, AREntryIdList * entryList, char *ent
 {
 	if (entry_id && *entry_id) {
 		/*
-		 * if the entry id is too long, it is probably refering to a
+		 * if the entry id contains at least one AR_ENTRY_ID_SEPARATOR, it is probably refering to a
 		 * join schema. split it, and fill in the entryIdList with
 		 * the components.
 		 */
 
-		if (strlen(entry_id) > AR_MAX_ENTRYID_SIZE) {
+		int numSep = strsrch(entry_id, AR_ENTRY_ID_SEPARATOR);
+		if( numSep > 0 ){
 			char           *eid_dup, *eid_orig, *tok;
 			int             tn = 0, len = 0;
 
@@ -2288,7 +2348,7 @@ perl_BuildEntryList(ARControlStruct * ctrl, AREntryIdList * entryList, char *ent
 			if (!eid_dup || !tok)
 				croak("perl_BuildEntryList out of memory: can't strdup entry-id buffer.");
 
-			entryList->numItems = strsrch(eid_dup, AR_ENTRY_ID_SEPARATOR) + 1;
+			entryList->numItems = numSep + 1;
 			entryList->entryIdList = (AREntryIdType *) MALLOCNN(sizeof(AREntryIdType) *
 						       entryList->numItems);
 
@@ -2304,12 +2364,12 @@ perl_BuildEntryList(ARControlStruct * ctrl, AREntryIdList * entryList, char *ent
 			eid_dup = my_strtok(eid_dup, tok, len, AR_ENTRY_ID_SEPARATOR);
 			while (*eid_dup) {
 				(void) strncpy(entryList->entryIdList[tn], tok, sizeof(AREntryIdType));
-				*(entryList->entryIdList[tn++] + AR_MAX_ENTRYID_SIZE + 1) = 0;
+				*(entryList->entryIdList[tn++] + AR_MAX_ENTRYID_SIZE) = 0;
 				eid_dup = my_strtok(eid_dup + 1, tok, len, AR_ENTRY_ID_SEPARATOR);
 			}
 
 			(void) strncpy(entryList->entryIdList[tn], tok, sizeof(AREntryIdType));
-			*(entryList->entryIdList[tn++] + AR_MAX_ENTRYID_SIZE + 1) = 0;
+			*(entryList->entryIdList[tn++] + AR_MAX_ENTRYID_SIZE) = 0;
 
 			AP_FREE(eid_orig);
 			AP_FREE(tok);
@@ -2494,6 +2554,7 @@ perl_ARSortList(ARControlStruct * ctrl, ARSortList * in)
 	return newRV_noinc((SV *) array);
 }
   
+#if AR_EXPORT_VERSION >= 8L
 SV             *
 perl_ARArchiveInfoStruct(ARControlStruct * ctrl, ARArchiveInfoStruct * in)
 {
@@ -2536,6 +2597,7 @@ perl_ARArchiveInfoStruct(ARControlStruct * ctrl, ARArchiveInfoStruct * in)
 		 newSVpv(in->archiveFrom, 0), 0);
 	return newRV_noinc((SV *) hash);
 }
+#endif
   
 #if AR_EXPORT_VERSION >= 4
 SV             *
@@ -2569,9 +2631,16 @@ perl_ARAttach(ARControlStruct * ctrl, ARAttachStruct * in)
 SV             *
 perl_ARByteList(ARControlStruct * ctrl, ARByteList * in)
 {
-	HV             *hash = newHV();
-	SV             *byte_list = newSVpv((char *) in->bytes, in->numItems);
+	HV             *hash;
+	SV             *byte_list;
 	int             i;
+
+	if( in->numItems == 0 ){
+	    return newSVsv(&PL_sv_undef);
+	}
+
+	hash = newHV();
+	byte_list = newSVpv((char *) in->bytes, in->numItems);
 
 	for (i = 0; ByteListTypeMap[i].number != TYPEMAP_LAST; i++) {
 		if (ByteListTypeMap[i].number == in->type)
@@ -2917,6 +2986,8 @@ perl_AROwnerObj(ARControlStruct * ctrl, ARContainerOwnerObj * in)
 	return newRV_noinc((SV *) hash);
 }
 
+#endif
+#if AR_EXPORT_VERSION >= 6
 SV *
 perl_AROwnerObjList(ARControlStruct * ctrl, ARContainerOwnerObjList * in) {
 	AV *array = newAV();
@@ -3595,4 +3666,28 @@ sv_to_ARValue(ARControlStruct * ctrl, SV * in, unsigned int dataType,
 	}
 	return 0;
 }
+
+
+
+
+#if AR_EXPORT_VERSION >= 7L
+SV*
+perl_ARCurrencyDetailList(ARControlStruct * ctrl, ARCurrencyDetailList * in)
+{
+	AV             *array = newAV();
+	unsigned int   i;
+
+	for (i = 0; i < in->numItems; i++) {
+		HV             *currDetail = newHV();
+
+		hv_store(currDetail,  "currencyCode", strlen("currencyCode"), newSVpv(in->currencyDetailList[i].currencyCode,0), 0);
+		hv_store(currDetail,  "precision",    strlen("precision"),    newSViv(in->currencyDetailList[i].precision), 0);
+		av_push(array, newRV_noinc((SV *) currDetail));
+	}
+	return newRV_noinc((SV *) array);
+}
+#endif
+
+
+
 

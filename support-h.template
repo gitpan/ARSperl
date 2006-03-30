@@ -1,5 +1,5 @@
 /*
-$Header: /cvsroot/arsperl/ARSperl/support-h.template,v 1.25 2005/05/23 12:11:37 idtrimnell Exp $
+$Header: /cvsroot/arsperl/ARSperl/support-h.template,v 1.29 2005/09/05 21:07:19 tstapff Exp $
 
     ARSperl - An ARS v2 - v5 / Perl5 Integration Kit
 
@@ -346,6 +346,9 @@ EXTERN unsigned int  caseLookUpTypeNumber(TypeMapStruct *t, char *s);
 /* typedef SV* (*ARS_fn)(void *); */
 typedef void *(*ARS_fn)(ARControlStruct *ctrl, void *b);
 
+EXTERN FILE* get_logging_file_ptr();
+EXTERN void  set_logging_file_ptr( FILE* );
+
 EXTERN void        *mallocnn(int s);
 EXTERN void        *debug_mallocnn(int s, char *file, char *func, int line);
 EXTERN void         debug_free(void *p, char *file, char *func, int line);
@@ -394,7 +397,9 @@ EXTERN SV *perl_ARActiveLinkActionStruct(ARControlStruct *ctrl,
 					 ARActiveLinkActionStruct *);
 EXTERN SV *perl_ARFilterActionStruct(ARControlStruct *ctrl,  ARFilterActionStruct *);
 EXTERN SV *perl_AROwnerObj(ARControlStruct *ctrl,  ARContainerOwnerObj *);
+#if AR_EXPORT_VERSION >= 6L
 EXTERN SV *perl_AROwnerObjList(ARControlStruct *ctrl,  ARContainerOwnerObjList *);
+#endif
 EXTERN SV *perl_ARReferenceStruct(ARControlStruct *ctrl,  ARReferenceStruct *);
 EXTERN SV *perl_ARReferenceList(ARControlStruct *ctrl,  ARReferenceList *);
 EXTERN SV *perl_expandARCharMenuStruct( ARControlStruct *, ARCharMenuStruct *);
@@ -453,13 +458,14 @@ EXTERN SV *perl_ARViewMappingStruct(ARControlStruct *ctrl,  ARViewMappingStruct 
 EXTERN SV *perl_ARJoinSchema(ARControlStruct *ctrl,  ARJoinSchema *);
 EXTERN SV *perl_ARViewSchema(ARControlStruct *ctrl,  ARViewSchema *);
 EXTERN SV *perl_ARCompoundSchema(ARControlStruct *ctrl,  ARCompoundSchema *);
-EXTERN SV *perl_ARArchiveInfoStruct(ARControlStruct *ctrl,  ARArchiveInfoStruct *);
 EXTERN SV *perl_ARSortList(ARControlStruct *ctrl,  ARSortList *);
 EXTERN SV *perl_ARByteList(ARControlStruct *ctrl,  ARByteList *);
 EXTERN SV *perl_ARCoordStruct(ARControlStruct *ctrl,  ARCoordStruct *);
 EXTERN int perl_BuildEntryList(ARControlStruct *ctrl,  AREntryIdList *entryList, 
 				char *entry_id);
 EXTERN SV *perl_ARAssignSQLStruct(ARControlStruct *ctrl,  ARAssignSQLStruct *in);
+#endif
+#if AR_EXPORT_VERSION >= 6L
 EXTERN SV *perl_ARAssignFilterApiStruct(ARControlStruct *ctrl,  ARAssignFilterApiStruct *in);
 #endif
 
@@ -491,6 +497,20 @@ EXTERN SV *perl_ARCloseWndStruct(ARControlStruct * ctrl,
 EXTERN SV *perl_ARWaitStruct(ARControlStruct * ctrl,
 				ARWaitStruct * in);
 #endif
+
+
+#if AR_EXPORT_VERSION >= 7L
+EXTERN SV *perl_ARCurrencyDetailList(ARControlStruct * ctrl,
+				ARCurrencyDetailList * in);
+#endif
+
+
+#if AR_EXPORT_VERSION >= 8L
+EXTERN SV *perl_ARArchiveInfoStruct(ARControlStruct *ctrl,  ARArchiveInfoStruct *);
+#endif
+
+
+
 
 #ifndef BSD
 # define MEMCAST void
