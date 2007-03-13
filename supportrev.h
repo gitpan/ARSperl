@@ -1,5 +1,5 @@
 /*
-$Header: /cvsroot/arsperl/ARSperl/supportrev.h,v 1.12 2004/09/23 17:34:24 jmccarrell Exp $
+$Header: /cvsroot/arsperl/ARSperl/supportrev.h,v 1.15 2007/03/06 01:54:26 tstapff Exp $
 
     ARSperl - An ARS v2 - v5 / Perl5 Integration Kit
 
@@ -35,14 +35,20 @@ $Header: /cvsroot/arsperl/ARSperl/supportrev.h,v 1.12 2004/09/23 17:34:24 jmccar
 # define EXTERN 
 #endif
 
+/* not defined in AR version 5.0.0 */
+#ifndef AR_MAX_LEVELS_DYNAMIC_MENU
+#define AR_MAX_LEVELS_DYNAMIC_MENU  5
+#endif
+
 EXTERN int  compmem(MEMCAST *m1, MEMCAST *m2, int size);
 EXTERN int  copymem(MEMCAST *m1, MEMCAST *m2, int size);
 
-
+EXTERN unsigned int revTypeName(TypeMapStruct *t, char *type);
 EXTERN int strcpyHVal( HV *h, char *k, char *b, int len);
 EXTERN int strmakHVal( HV *h, char *k, char **b);
 EXTERN int intcpyHVal( HV *h, char *k, int *b);
 EXTERN int uintcpyHVal( HV *h, char *k, unsigned int *b);
+EXTERN int boolcpyHVal( HV *h, char *k, ARBoolean *b);
 EXTERN int longcpyHVal( HV *h, char *k, long *b);
 EXTERN int ulongcpyHVal( HV *h, char *k, unsigned long *b);
 EXTERN int rev_ARDisplayList(ARControlStruct *ctrl, 
@@ -102,4 +108,24 @@ EXTERN int strncasecmp(char *s1, char *s2, size_t n);
 
 #endif /* def _WIN32 */
 
+
+EXTERN int rev_ARDisplayInstanceList(ARControlStruct *ctrl,
+			  HV *h, char *k, ARDisplayInstanceList *d);
+EXTERN int rev_ARDisplayInstanceStruct(ARControlStruct *ctrl,
+			  HV *h, ARDisplayInstanceStruct *d);
+EXTERN int rev_ARPermissionList(ARControlStruct *ctrl,
+			  HV *h, char *k, ARPermissionList *d);
+
+EXTERN int rev_ARReferenceStruct( ARControlStruct *ctrl, HV *h, char *k, ARReferenceStruct *p );
+
+EXTERN int rev_ARCharMenuItemStruct( ARControlStruct *ctrl, HV *h, char *k, ARCharMenuItemStruct *p );
+
+#if AR_EXPORT_VERSION >= 4
+EXTERN int
+rev_ARMessageStruct(ARControlStruct * ctrl, 
+                    HV * h, char *k, ARMessageStruct * m);
+#endif
+
+
 #endif /* __supportrev_h_ */
+

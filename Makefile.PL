@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl
 #
-# $Header: /cvsroot/arsperl/ARSperl/Makefile.PL,v 1.73 2005/09/19 14:40:30 jeffmurphy Exp $
+# $Header: /cvsroot/arsperl/ARSperl/Makefile.PL,v 1.76 2007/02/03 02:33:10 tstapff Exp $
 #
 # ARSperl Makefile
 #
@@ -49,7 +49,7 @@ $ARSAPI     = "/usr/ar/api";
 
 # STEP 2 -> Choose your version of ARS FROM THE FOLLOWING LIST
 #
-#                  2.0 2.1 3.0 3.1 3.2 4.0 4.52 5.0 6.0 6.01 6.3
+#                  2.0 2.1 3.0 3.1 3.2 4.0 4.52 5.0 6.0 6.01 6.3 7.0
 #
 #           notes
 #            - if there is a maintenace number (e.g. 4.5.2)
@@ -60,7 +60,7 @@ $ARSAPI     = "/usr/ar/api";
 #              your version (e.g. for 4.5 you would specify 4.0, NOT
 #	       4.52)
 #
-$ARSVERSION = 6.3;
+$ARSVERSION = 7.0;
 
 # STEP 3 -> Choose whether or not to enable encryption
 #
@@ -104,14 +104,30 @@ foreach my $pm2install (qw{ARSarerrno-h.pm  ARSar-h.pm  ARSnparm.pm  ARSnterrno-
 	$PM->{$pm2install} = '$(INST_LIBDIR)/'.$pm2install;
 }
 
-if ($ARSVERSION >= 6.3) {
-        $ARS_STATIC_LIB = $ARSAPI."/lib/libar.a";
+if ($ARSVERSION >= 7.0) {
+	$ARS_STATIC_LIB = $ARSAPI."/lib/libar.a";
 	$ARS_LIBS = "";
 	$PM->{'artypes.ph'} = '$(INST_LIBDIR)/artypes.ph';
 	if ($WINDOWS) {
-		    $ARS_LIBS = join(' ', map { '-l' . $_ } @{$ra_arlibs});
+		$ARS_LIBS = join(' ', map { '-l' . $_ } @{$ra_arlibs});
 	} else {
-		    $ARS_LIBS .= " -lpthread";
+		$ARS_LIBS .= " -lpthread -licuuc -licui18n";
+	}
+	$AUTODEFINES .= " -DARS32 ";
+	$AUTODEFINES .= " -DARS452 " if($ARSVERSION >= 4.52);
+	if ( ($ARSVERSION >= 5.0) && ($^O eq 'linux') ) {
+		$AUTODEFINES .= " -malign-double ";
+	}
+}
+
+elsif ($ARSVERSION >= 6.3) {
+	$ARS_STATIC_LIB = $ARSAPI."/lib/libar.a";
+	$ARS_LIBS = "";
+	$PM->{'artypes.ph'} = '$(INST_LIBDIR)/artypes.ph';
+	if ($WINDOWS) {
+		$ARS_LIBS = join(' ', map { '-l' . $_ } @{$ra_arlibs});
+	} else {
+		$ARS_LIBS .= " -lpthread";
 	}
 	$AUTODEFINES .= " -DARS32 ";
 	$AUTODEFINES .= " -DARS452 " if($ARSVERSION >= 4.52);
@@ -135,12 +151,16 @@ elsif ($ARSVERSION >= 6.0) {
 }
 
 elsif($ARSVERSION >= 5.0) {
- $ARS_LIBS = "-lar -lnsl";
+  $ARS_LIBS = "-lar -lnsl";
   if($ENCRYPT == 1) {
     $ARS_LIBS = "-lar -larencrypt -lnsl";
   }
-  $ARS_LIBS .= " -lnts" unless ($ARSVERSION >= 5.0);
-  $ARS_LIBS .= " -lpthread" unless $WINDOWS;
+  if ($WINDOWS) {
+    $ARS_LIBS = join(' ', map { '-l' . $_ } @{$ra_arlibs});
+  } else {
+	$ARS_LIBS .= " -lnts" unless ($ARSVERSION >= 5.0);
+    $ARS_LIBS .= " -lpthread";
+  }
   $AUTODEFINES .= " -DARS32 ";
   $AUTODEFINES .= " -DARS452 " if($ARSVERSION >= 4.52);
   if ( ($ARSVERSION >= 5.0) && ($^O eq 'linux') ) {
@@ -153,8 +173,12 @@ elsif($ARSVERSION >= 4.0) {
   if($ENCRYPT == 1) {
     $ARS_LIBS = "-lar -larencrypt -lnsl";
   } 
-  $ARS_LIBS .= " -lnts" unless ($ARSVERSION >= 5.0);
-  $ARS_LIBS .= " -lpthread" unless $WINDOWS;
+  if ($WINDOWS) {
+    $ARS_LIBS = join(' ', map { '-l' . $_ } @{$ra_arlibs});
+  } else {
+    $ARS_LIBS .= " -lnts" unless ($ARSVERSION >= 5.0);
+    $ARS_LIBS .= " -lpthread";
+  }
   $AUTODEFINES .= " -DARS32 ";	
   $AUTODEFINES .= " -DARS452 " if($ARSVERSION >= 4.52);
   if ( ($ARSVERSION >= 5.0) && ($^O eq 'linux') ) {
@@ -199,15 +223,21 @@ push(@extras, CAPI => 'TRUE') if ($] >= 5.005       &&
                                    ($Config{archname} =~ /-multi-thread\b/i))
                                  );
 
-$ARS_LDPATH = "-L$ARSAPI/lib";
-$INCLUDES   = "-I$ARSAPI/include";
+if( $WINDOWS ){
+  $ARS_LDPATH = qq{-L"$ARSAPI/lib"};
+  $INCLUDES   = qq{-I"$ARSAPI/include"};
+}else{
+  $ARS_LDPATH = "-L$ARSAPI/lib";
+  $INCLUDES   = "-I$ARSAPI/include";
+}
+
 
 GenerateSupportDotH("support-h.template", $INCLUDES);
 
 print "Generating serverTypeInfoHints.h ..\n";
 
 die "whoops. no file at ".$Config{'perlpath'} unless ( -f $Config{'perlpath'} );
-$cmd = "$Config{'perlpath'} infra/exsi.pl < ${ARSAPI}/include/ar.h > serverTypeInfoHints.h";
+$cmd = qq("$Config{'perlpath'}" infra/exsi.pl < "${ARSAPI}/include/ar.h" > serverTypeInfoHints.h);
 $rv = system($cmd);
 die "something went wrong when i ran \"$cmd\" (rv = $rv, expected 0)" unless ($rv == 0);
 
@@ -272,7 +302,7 @@ WriteMakefile(
 	      'NAME'	=> 'ARS',
 	      'VERSION_FROM' => 'ARS.pm',
 	      'LIBS'	=> ["${ARS_LDPATH} ${ARS_LIBS}"],
-	      'OBJECT'  => q[ARS$(OBJ_EXT) support$(OBJ_EXT) supportrev$(OBJ_EXT) ].$ARS_STATIC_LIB,
+	      'OBJECT'  => q[ARS$(OBJ_EXT) support$(OBJ_EXT) supportrev$(OBJ_EXT) ].($ARSVERSION >= 5.0 ? q[supportrev_generated$(OBJ_EXT) ] : '').($WINDOWS ? '' : $ARS_STATIC_LIB),
 	      'INC'	=> "${INCLUDES}",
 	
 	      'PM' => $PM,
@@ -353,6 +383,8 @@ sub GenerateSupportDotH {
     my (@arh);
 
     $incdir =~ s/^-I//g;
+    $incdir =~ s/^"//;
+    $incdir =~ s/"$//;
 
     print "Generating support.h file..\n";
 
