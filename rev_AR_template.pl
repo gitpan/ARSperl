@@ -63,7 +63,7 @@ EXTERN int rev_<@ $class @>( ARControlStruct *ctrl, HV *h, char *k, <@ $class @>
 @> }
 
 void copyIntArray( int size, int *dst, SV* src );
-void copyUIntArray( int size, unsigned int *dst, SV* src );
+void copyUIntArray( int size, ARInternalId *dst, SV* src );
 
 #endif /* __supportrev_generated_h_ */
 
@@ -75,6 +75,14 @@ void copyUIntArray( int size, unsigned int *dst, SV* src );
 #include "<@ $H_File @>"
 #include "supportrev.h"
 #include "support.h"
+
+
+/* #if defined(malloc) && defined(_WIN32)
+ #undef malloc
+ #undef calloc
+ #undef realloc
+ #undef free
+#endif */
 
 
 @> foreach my $class ( @classes_C ){
@@ -382,7 +390,7 @@ void copyIntArray( int size, int *dst, SV* src ){
 	}
 }
 
-void copyUIntArray( int size, unsigned int *dst, SV* src ){
+void copyUIntArray( int size, ARInternalId *dst, SV* src ){
 	AV *ar = (AV*) SvRV((SV*) src);
 	int len = av_len(ar);
 	int i;

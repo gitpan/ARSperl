@@ -1,7 +1,7 @@
 #
-#    ARSperl - An ARS v2-v5 / Perl5 Integration Kit
+#    ARSperl - An ARS v5-v7 / Perl5 Integration Kit
 #
-#    Copyright (C) 1995-2003 Joel Murphy, jmurphy@acsu.buffalo.edu
+#    Copyright (C) 1995-2007 Joel Murphy, jmurphy@acsu.buffalo.edu
 #                            Jeff Murphy, jcmurphy@acsu.buffalo.edu
 # 
 #    This program is free software; you can redistribute it and/or modify
@@ -81,25 +81,22 @@ ars_GetListServer ars_GetActiveLink ars_GetCharMenuItems ars_GetSchema
 ars_ExpandCharMenu
 ars_GetField ars_simpleMenu ars_GetListActiveLink ars_SetEntry 
 ars_perl_qualifier ars_Export ars_GetListFilter ars_GetListEscalation 
-ars_GetListCharMenu ars_GetListAdminExtension ars_padEntryid 
+ars_GetListCharMenu ars_padEntryid 
 ars_GetFilter ars_SetFilter
 ars_GetListEntryWithFields ars_GetMultipleEntries
 ars_GetProfileInfo ars_Import ars_GetCharMenu ars_GetServerStatistics 
-ars_NTDeregisterServer ars_NTGetListServer ars_NTInitializationServer 
-ars_NTNotificationServer ars_NTTerminationServer ars_NTDeregisterClient 
-ars_NTInitializationClient ars_NTRegisterClient ars_NTTerminationClient 
-ars_NTRegisterServer ars_GetCurrentServer ars_EncodeDiary 
+ars_GetCurrentServer ars_EncodeDiary 
 ars_CreateEntry ars_MergeEntry ars_DeleteFilter
 ars_DeleteMultipleFields ars_DeleteActiveLink
-ars_DeleteAdminExtension ars_DeleteCharMenu
+ars_DeleteCharMenu
 ars_DeleteEscalation ars_DeleteField ars_DeleteSchema
-ars_DeleteVUI ars_ExecuteAdminExtension ars_ExecuteProcess
-ars_GetAdminExtension ars_GetEscalation ars_GetFullTextInfo
+ars_DeleteVUI ars_ExecuteProcess
+ars_GetEscalation ars_GetFullTextInfo
 ars_GetListGroup ars_GetListSQL ars_GetListUser
 ars_GetListVUI 
 ars_GetServerInfo ars_SetServerInfo
 ars_GetEntryBLOB
-ars_CreateActiveLink ars_CreateAdminExtension
+ars_CreateActiveLink
 ars_GetControlStructFields ars_GetVUI
 ars_GetListContainer ars_GetContainer ars_DeleteContainer ars_SetServerPort
 ars_SetLogging ars_SetSessionConfiguration ars_SetImpersonatedUser
@@ -109,9 +106,11 @@ ars_SetActiveLink ars_CreateFilter ars_CreateEscalation ars_SetEscalation
 $ars_errstr %ARServerStats %ars_errhash
 ars_decodeStatusHistory ars_APIVersion ars_encodeStatusHistory
 ars_BeginBulkEntryTransaction ars_EndBulkEntryTransaction
+ars_GetAlertCount ars_RegisterForAlerts ars_DeregisterForAlerts ars_GetListAlertUser
+ars_DecodeAlertMessage ars_CreateAlertEvent ars_VerifyUser
 );
 
-$ARS::VERSION   = '1.90';
+$ARS::VERSION   = '1.91';
 $ARS::DEBUGGING = 0;
 
 $ARS::logging_file_ptr = 0;
@@ -265,15 +264,19 @@ sub ars_simpleMenu {
 #   undef on error
 
 sub ars_padEntryid {
-    my($c) = shift;
-    my($schema) = shift;
-    my($entry_id) = shift;
-    my($field);
+	my($c) = shift;
+	my($schema) = shift;
+	my($entry_id) = shift;
+	my($field);
 
-    # entry id field is field id #1
-    ($field = ars_GetField($c, $schema, 1)) ||
+	# entry id field is field id #1
+	($field = ars_GetField($c, $schema, 1)) ||
 	return undef;
-    return ("0"x($field->{limit}{maxLength}-length($entry_id))).$entry_id;
+	if( $field->{defaultVal} ){
+		return $field->{defaultVal}.("0"x($field->{limit}{maxLength}-length($field->{defaultVal})-length($entry_id))).$entry_id;
+	}else{
+		return ("0"x($field->{limit}{maxLength}-length($entry_id))).$entry_id;
+	}	
 }
 
 # ROUTINE
