@@ -1,0 +1,8 @@
+package CCACHE;
+# enter your server, admin username and password below.
+
+sub SERVER { "" ; }
+sub USERNAME { "" ; }
+sub PASSWORD { "" ; }
+sub TCPPORT { 0 ; }
+1;

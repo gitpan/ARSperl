@@ -1,5 +1,5 @@
 /*
-$Header: /cvsroot/arsperl/ARSperl/supportrev.h,v 1.16 2007/04/21 22:22:06 tstapff Exp $
+$Header: /cvsroot/arsperl/ARSperl/supportrev.h,v 1.19 2009/04/02 18:57:04 tstapff Exp $
 
     ARSperl - An ARS v2 - v5 / Perl5 Integration Kit
 
@@ -88,6 +88,11 @@ EXTERN int rev_ARActiveLinkMacroStruct(ARControlStruct *ctrl,
 EXTERN int rev_ARMacroParmList(ARControlStruct *ctrl,
 			       HV *h, char *k, ARMacroParmList *m);
 
+#if AR_CURRENT_API_VERSION >= 14
+EXTERN int rev_ARImageDataStruct(ARControlStruct * ctrl,
+			  HV * h, char *k, ARImageDataStruct * b);
+#endif
+
 #if AR_EXPORT_VERSION >= 3
 EXTERN int rev_ARByteList(ARControlStruct *ctrl,
 			  HV *h, char *k, ARByteList *b);
@@ -99,7 +104,7 @@ EXTERN int rev_ARAssignSQLStruct(ARControlStruct *ctrl,
 				 HV *h, char *k, ARAssignSQLStruct *s);
 #endif
 
-#ifdef _WIN32
+#if defined(_WIN32) && !defined(__GNUC__)
 /* roll our own strcasecmp and strncasecmp for Win */
 
 EXTERN int strcasecmp(char *s1, char *s2);
@@ -132,6 +137,14 @@ rev_ARMessageStruct(ARControlStruct * ctrl,
 
 #if AR_EXPORT_VERSION >= 8L
 EXTERN int rev_ARArchiveInfoStruct( ARControlStruct *ctrl, HV *h, char *k, ARArchiveInfoStruct *p );
+#endif
+
+EXTERN int rev_ARArithOpStruct( ARControlStruct *ctrl, HV *h, char *k, ARArithOpStruct *p );
+
+
+#if AR_CURRENT_API_VERSION >= 14
+EXTERN int rev_ARMultiSchemaFieldIdStruct( ARControlStruct *ctrl, HV *h, char *k, ARMultiSchemaFieldIdStruct *p );
+EXTERN int rev_ARMultiSchemaArithOpStruct( ARControlStruct *ctrl, HV *h, char *k, ARMultiSchemaArithOpStruct *p );
 #endif
 
 

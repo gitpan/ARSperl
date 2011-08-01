@@ -1,5 +1,5 @@
 /*
-$Header: /cvsroot/arsperl/ARSperl/ARS.xs,v 1.118 2007/09/13 22:50:25 tstapff Exp $
+$Header: /cvsroot/arsperl/ARSperl/ARS.xs,v 1.127 2011/07/29 13:05:27 tstapff Exp $
 
     ARSperl - An ARS v2 - v5 / Perl5 Integration Kit
 
@@ -32,12 +32,12 @@ $Header: /cvsroot/arsperl/ARSperl/ARS.xs,v 1.118 2007/09/13 22:50:25 tstapff Exp
 #endif
 
 
-/* #if defined(malloc) && defined(_WIN32)
+#if defined(ARSPERL_UNDEF_MALLOC) && defined(malloc)
  #undef malloc
  #undef calloc
  #undef realloc
  #undef free
-#endif */
+#endif
 
 
 MODULE = ARS		PACKAGE = ARS		PREFIX = ARS
@@ -87,6 +87,50 @@ ars_perl_qualifier(ctrl, in)
 	}
 	OUTPUT:
 	RETVAL
+
+ARQualifierStruct *
+ars_qualifier_ptr(ctrl, in)
+	ARControlStruct *	ctrl
+	SV * in
+	CODE:
+	{
+	  ARQualifierStruct *qual;
+	  HV *h_dummy;
+	  HV *h;
+	  int rv = 0;	  
+
+	  AMALLOCNN(qual, 1, ARQualifierStruct);
+	  (void) ARError_reset();
+
+	  if( SvTYPE(SvRV(in)) != SVt_PVHV ){
+		  ARError_add( AR_RETURN_ERROR, AP_ERR_GENERAL, "rev_ARQualifierStruct: not a hash value" );
+		  RETVAL = NULL;
+		  goto ars_qualifier_ptr_end;
+	  }
+	  h = (HV* ) SvRV((SV*) in);
+	  if( ! SvTRUE(hv_scalar(h)) ){
+		  RETVAL = qual;
+		  goto ars_qualifier_ptr_end;
+	  }
+
+	  h_dummy = newHV();
+	  SvREFCNT_inc( in );
+	  hv_store( h_dummy, "_", 1, in, 0 );
+	  rv += rev_ARQualifierStruct( ctrl, h_dummy, "_", qual );
+	  hv_undef( h_dummy );
+
+	  if( rv == 0 ){
+		  RETVAL = qual;
+	  }else{
+		  ARError_add( AR_RETURN_ERROR, AP_ERR_PREREVFAIL );
+		  RETVAL = NULL;
+		  FreeARQualifierStruct(qual, TRUE);
+	  }
+	  ars_qualifier_ptr_end:;
+	}
+	OUTPUT:
+	RETVAL
+
 
 ARQualifierStruct *
 ars_LoadQualifier(ctrl,schema,qualstring,displayTag=NULL)
@@ -195,7 +239,7 @@ ars_SetServerPort(ctrl, name, port, progNum)
 	RETVAL
 
 ARControlStruct *
-ars_Login(server, username, password, lang=NULL, authString=NULL, tcpport=0, rpcnumber=0)
+ars_Login(server, username, password, lang=NULL, authString=NULL, tcpport=0, rpcnumber=0, ...)
 	char *		server
 	char *		username
 	char *		password
@@ -206,6 +250,7 @@ ars_Login(server, username, password, lang=NULL, authString=NULL, tcpport=0, rpc
 	CODE:
 	{
 		int              ret = 0, s_ok = 1;
+		int              staticParams = 7;
 		ARStatusList     status;
 		ARServerNameList serverList;
 		ARControlStruct *ctrl;
@@ -241,6 +286,8 @@ ars_Login(server, username, password, lang=NULL, authString=NULL, tcpport=0, rpc
 #else
 		DBG( ("safemalloc ARControlStruct\n") );
 		ctrl = (ARControlStruct *)safemalloc(sizeof(ARControlStruct));
+		/* DBG( ("malloc ARControlStruct\n") );
+		ctrl = (ARControlStruct *)MALLOCNN(sizeof(ARControlStruct)); */
 		Zero(ctrl, 1, ARControlStruct);
 #endif
 #ifdef PROFILE
@@ -271,6 +318,40 @@ ars_Login(server, username, password, lang=NULL, authString=NULL, tcpport=0, rpc
 		if ( CVLD(lang) ) {
 			strncpy(ctrl->localeInfo.locale, lang, AR_MAX_LANG_SIZE);
 		}
+
+		if( items > staticParams ){
+			int i;
+			HV *h;
+
+			if( (items - staticParams) % 2 ){
+			    (void) ARError_add( AR_RETURN_ERROR, AP_ERR_BAD_ARGS);
+	      			AP_FREE(ctrl); /* invalid, cleanup */
+	      			goto ar_login_end;
+			}
+
+			h = newHV();			
+			for( i = staticParams; i < items; i+=2 ){
+				hv_store_ent( h, newSVsv(ST(i)), newSVsv(ST(i+1)), 0 );
+			}
+
+			if( hv_exists(h,"charSet",7) ){
+				strncpy( ctrl->localeInfo.charSet, SvPV_nolen( *(hv_fetch(h,"charSet",7,0)) ), AR_MAX_LANG_SIZE );
+			}
+			if( hv_exists(h,"timeZone",8) ){
+				strncpy( ctrl->localeInfo.timeZone, SvPV_nolen( *(hv_fetch(h,"timeZone",8,0)) ), AR_MAX_LOCALE_SIZE );
+			}
+			if( hv_exists(h,"customDateFormat",16) ){
+				strncpy( ctrl->localeInfo.customDateFormat, SvPV_nolen( *(hv_fetch(h,"customDateFormat",16,0)) ), AR_MAX_FORMAT_SIZE );
+			}
+			if( hv_exists(h,"customTimeFormat",16) ){
+				strncpy( ctrl->localeInfo.customTimeFormat, SvPV_nolen( *(hv_fetch(h,"customTimeFormat",16,0)) ), AR_MAX_FORMAT_SIZE );
+			}
+			if( hv_exists(h,"separators",10) ){
+				strncpy( ctrl->localeInfo.separators, SvPV_nolen( *(hv_fetch(h,"separators",10,0)) ), AR_MAX_LANG_SIZE );
+			}
+
+			hv_undef( h );
+		}
 #endif
 #if AR_EXPORT_VERSION >= 7L
 		ctrl->authString[0] = 0;
@@ -289,6 +370,11 @@ ars_Login(server, username, password, lang=NULL, authString=NULL, tcpport=0, rpc
 			AP_FREE(ctrl);
 			goto ar_login_end;
 		}
+
+		/*
+		printf( "ctrl->localeInfo.customDateFormat <%s>\n", ctrl->localeInfo.customDateFormat );
+		printf( "ctrl->localeInfo.separators <%s>\n",       ctrl->localeInfo.separators );
+		*/
 #endif
 
 		if (!server || !*server) {
@@ -332,6 +418,7 @@ ars_Login(server, username, password, lang=NULL, authString=NULL, tcpport=0, rpc
 			ARError(ret, status);
 			AP_FREE(ctrl);
 			RETVAL = NULL;
+ 			goto ar_login_end;
 		}
 
 	  	/* finally, check to see if the user id is valid */
@@ -483,7 +570,14 @@ ars_GetListField(control,schema,changedsince=0,fieldType=AR_FIELD_TYPE_ALL)
 	  Zero(&idlist, 1, ARInternalIdList);
 	  Zero(&status, 1, ARStatusList);
 #if AR_EXPORT_VERSION >= 3
-	  ret = ARGetListField(control,schema,fieldType,changedsince,&idlist,&status);
+	  ret = ARGetListField(control,schema,
+	  			fieldType,
+	  			changedsince,
+#if AR_CURRENT_API_VERSION >= 17
+				NULL,   /* &objPropList (undocumented by BMC) */
+#endif
+	  			&idlist,
+	  			&status);
 #else
 	  ret = ARGetListField(control,schema,changedsince,&idlist,&status);
 #endif
@@ -508,109 +602,73 @@ ars_GetFieldByName(control,schema,field_name)
 	  unsigned int     loop = 0;
 	  ARInternalIdList idList;
 	  ARStatusList     status;
-#if AR_EXPORT_VERSION >= 3
 	  ARNameType       fieldName;
-#else
-	  ARDisplayList    displayList;
-#endif
 	  (void) ARError_reset();
 	  Zero(&idList, 1, ARInternalIdList);
 	  Zero(&status, 1, ARStatusList);
-#if AR_EXPORT_VERSION >= 3
-	  ret = ARGetListField(control, schema, AR_FIELD_TYPE_ALL, (ARTimestamp)0, &idList, &status);
-#else
-	  ret = ARGetListField(control, schema, (ARTimestamp)0, &idList, &status);
+	  ret = ARGetListField(control, schema,
+	  			AR_FIELD_TYPE_ALL, 
+	  			(ARTimestamp)0,
+#if AR_CURRENT_API_VERSION >= 17
+				NULL,   /* &objPropList (undocumented by BMC) */
 #endif
+	  			&idList,
+	  			&status);
 #ifdef PROFILE
 	  ((ars_ctrl *)control)->queries++;
 #endif
 	  if (! ARError( ret, status)) {
 	    for (loop=0; loop<idList.numItems; loop++) {
-#if AR_EXPORT_VERSION >= 9
+#if AR_CURRENT_API_VERSION >= 17
+	      ret = ARGetFieldCached(control, schema, idList.internalIdList[loop], fieldName, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, &status);
+#elif AR_CURRENT_API_VERSION >= 12
 	      ret = ARGetFieldCached(control, schema, idList.internalIdList[loop], fieldName, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, &status);
-#elif AR_EXPORT_VERSION >= 3
-	      ret = ARGetFieldCached(control, schema, idList.internalIdList[loop], fieldName, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, &status);
 #else
-	      ret = ARGetFieldCached(control, schema, idList.internalIdList[loop], NULL, NULL, NULL, NULL, NULL, NULL, &displayList, NULL, NULL, NULL, NULL, NULL, &status);
+	      ret = ARGetFieldCached(control, schema, idList.internalIdList[loop], fieldName, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, &status);
 #endif
 	      if (ARError( ret, status))
 	        break;
-#if AR_EXPORT_VERSION >= 3
-	      if (strcmp(field_name, fieldName) == 0)
-#else 
-	      if (displayList.numItems < 1) {
-		(void) ARError_add( ARSPERL_TRACEBACK, 1, "No fields were returned in display list");
-		break;
+	      if (strcmp(field_name, fieldName) == 0){
+		    XPUSHs(sv_2mortal(newSViv(idList.internalIdList[loop])));
+		    break;
 	      }
-	      if (strcmp(field_name,displayList.displayList[0].label)==0)
-#endif
-	      {
-		XPUSHs(sv_2mortal(newSViv(idList.internalIdList[loop])));
-#if AR_EXPORT_VERSION < 3
-		FreeARDisplayList(&displayList, FALSE);
-#endif
-		break;
-	      }
-#if AR_EXPORT_VERSION < 3
-	      FreeARDisplayList(&displayList, FALSE);
-#endif
 	    }
 	    FreeARInternalIdList(&idList, FALSE);
 	  }
 	}
 
 void
-ars_GetFieldTable(control,schema)
-	ARControlStruct *	control
+ars_GetFieldTable(ctrl,schema)
+	ARControlStruct *	ctrl
 	char *			schema
 	PPCODE:
 	{
 	  int              ret = 0;
 	  unsigned int     loop = 0;
-	  ARInternalIdList idList;
-	  ARStatusList     status;
-#if AR_EXPORT_VERSION >= 3
-	  ARNameType       fieldName;
-#else
-	  ARDisplayList    displayList;
-#endif
+	  HV   *fields, *h;
+	  char *hkey;
+	  SV   *hval, **hvalName;
+	  I32  klen;
+
 	  (void) ARError_reset();
-	  Zero(&idList, 1, ARInternalIdList);
-	  Zero(&status, 1,ARStatusList);
-#if AR_EXPORT_VERSION >= 3
-	  ret = ARGetListField(control, schema, AR_FIELD_TYPE_ALL, (ARTimestamp)0, &idList, &status);
-#else
-	  ret = ARGetListField(control, schema, (ARTimestamp)0, &idList, &status);
-#endif
-#ifdef PROFILE
-	  ((ars_ctrl *)control)->queries++;
-#endif
-	  if (! ARError( ret, status)) {
-	    for (loop=0; loop<idList.numItems; loop++) {
-#if AR_EXPORT_VERSION >= 9
-	      ret = ARGetFieldCached(control, schema, idList.internalIdList[loop], fieldName, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, &status);
-#elif AR_EXPORT_VERSION >= 3
-	      ret = ARGetFieldCached(control, schema, idList.internalIdList[loop], fieldName, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, &status);
-#else
-	      ret = ARGetFieldCached(control, schema, idList.internalIdList[loop], NULL, NULL, NULL, NULL, NULL, NULL, &displayList, NULL, NULL, NULL, NULL, NULL, &status);
-#endif
-	      if (ARError( ret, status))
-	        break;
-#if AR_EXPORT_VERSION >= 3
-	      XPUSHs(sv_2mortal(newSVpv(fieldName, 0)));
-#else
-	      if (displayList.numItems < 1) {
-		(void) ARError_add( ARSPERL_TRACEBACK, 1, "No fields were returned in display list");
-		continue;
-	      }
-	      XPUSHs(sv_2mortal(newSVpv(displayList.displayList[0].label, strlen(displayList.displayList[0].label))));
-#endif
-	      XPUSHs(sv_2mortal(newSViv(idList.internalIdList[loop])));
-#if AR_EXPORT_VERSION < 3
-	      FreeARDisplayList(&displayList, FALSE);
-#endif
-	    }
-	    FreeARInternalIdList(&idList, FALSE);
+
+	  fields = fieldcache_get_schema_fields( ctrl, schema, TRUE );
+	  if( ! fields ){
+		goto get_fieldtable_end;
+	  }
+
+	  hv_iterinit( fields );
+	  while( (hval = hv_iternextsv(fields,&hkey,&klen)) ){
+		if( strcmp(hkey,"0") == 0 )  continue;
+		h = (HV* ) SvRV(hval);
+		hvalName = hv_fetch( h, "name", 4, 0 );
+		XPUSHs( sv_2mortal(newSVsv(*hvalName)) );
+		XPUSHs( sv_2mortal(newSVpv(hkey,0)) );
+	  }
+
+	  get_fieldtable_end:;
+	  if( ! fields ){
+	    XSRETURN_UNDEF;
 	  }
 	}
 
@@ -621,48 +679,91 @@ ars_CreateEntry(ctrl,schema,...)
 	CODE:
 	{
 	  int               a = 0, 
-			    i = 0, 
+			    i = 0,
 			    c = (items - 2) / 2;
 	  AREntryIdType     entryId;
 	  ARFieldValueList  fieldList;
+	  ARInternalIdList  getFieldIds; 
 	  ARStatusList      status;
 	  int               ret = 0, rv = 0;
-	  unsigned int      dataType = 0;
+	  unsigned int      dataType = 0, j = 0;
+	  HV               *cacheFields;
 	  
 	  RETVAL=NULL;
 	  (void) ARError_reset();
 	  Zero(&entryId, 1, AREntryIdType);
 	  Zero(&fieldList, 1, ARFieldValueList);
+	  Zero(&getFieldIds, 1, ARInternalIdList);
 	  Zero(&status, 1, ARStatusList);
 	  if (((items - 2) % 2) || c < 1) {
 	    (void) ARError_add( AR_RETURN_ERROR, AP_ERR_BAD_ARGS);
 	  } else {
+
+	    cacheFields = fieldcache_get_schema_fields( ctrl, schema, FALSE );
+	    if( ! cacheFields ){
+	      goto create_entry_end;
+	    }
+
 	    fieldList.numItems = c;
 	    AMALLOCNN(fieldList.fieldValueList,c,ARFieldValueStruct);
-	    for (i=0; i<c; i++) {
+
+	    getFieldIds.numItems = 0;
+	    getFieldIds.internalIdList = NULL;
+
+	    /* try to get data type from field cache, collect fieldIds which are not cached */
+	    for (i=0; i<c; ++i) {
+	      ARInternalId fieldId;
 	      a = i*2+2;
-	      fieldList.fieldValueList[i].fieldId = SvIV(ST(a));
-#if AR_EXPORT_VERSION >= 9
-	      ret = ARGetFieldCached(ctrl, schema, fieldList.fieldValueList[i].fieldId,	
-			NULL, NULL, &dataType, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
-			NULL, NULL, NULL, NULL, &status);
-#elif AR_EXPORT_VERSION >= 3
-	      ret = ARGetFieldCached(ctrl, schema, fieldList.fieldValueList[i].fieldId,	
-			NULL, NULL, &dataType, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
-			NULL, NULL, NULL, NULL, &status);
-#else
-	      ret = ARGetFieldCached(ctrl, schema, fieldList.fieldValueList[i].fieldId, 
-			&dataType, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 
-			NULL, NULL, &status);
-#endif
-	      if (ARError( ret, status)) {
-		goto create_entry_end;
-	      }
-	      if (sv_to_ARValue(ctrl, ST(a+1), dataType, 
-		  	        &fieldList.fieldValueList[i].value) < 0) {
-		goto create_entry_end;
+	      fieldId = fieldList.fieldValueList[i].fieldId = SvIV(ST(a));
+
+	      dataType = fieldcache_get_data_type( cacheFields, fieldId );
+	      if (dataType <= AR_DATA_TYPE_MAX_TYPE) {
+	        /* printf( "%s [%d] found in cache\n", schema, fieldId ); fflush(stdout); */ /* _DEBUG_ */
+	        if (sv_to_ARValue(ctrl, ST(a+1), dataType, &fieldList.fieldValueList[i].value) < 0) {
+	          goto create_entry_end;
+	        }
+		  }else{
+		    if( getFieldIds.numItems == 0 ){
+	          AMALLOCNN(getFieldIds.internalIdList,c,ARInternalId);
+	        }
+	        /* printf( "%s [%d] collect for loading\n", schema, fieldId ); fflush(stdout); */ /* _DEBUG_ */
+            getFieldIds.internalIdList[getFieldIds.numItems] = fieldId;
+		  	++getFieldIds.numItems;
+		  }
+	    }
+
+	    /* load missing fields into cache */
+	    if( getFieldIds.numItems > 0 ){
+	      /* printf( "--- load missing fields ---\n" ); fflush(stdout); */ /* _DEBUG_ */
+	      /* if( fieldcache_load_schema(ctrl,schema,&getFieldIds,NULL) != AR_RETURN_OK ){ */
+	      if( fieldcache_load_schema(ctrl,schema,&getFieldIds,NULL) > AR_RETURN_WARNING ){
+	        goto create_entry_end;
 	      }
 	    }
+
+	    /* now get data type from the freshly cached fields */
+	    i = 0;
+	    for (j=0; j<getFieldIds.numItems; ++j) {
+	      ARInternalId fieldId = getFieldIds.internalIdList[j];
+	      while(fieldId != fieldList.fieldValueList[i].fieldId) ++i;
+	      a = i*2+2;
+
+	      dataType = fieldcache_get_data_type( cacheFields, fieldId );
+	      if (dataType <= AR_DATA_TYPE_MAX_TYPE) {
+	        /* printf( "%s [%d] freshly loaded\n", schema, fieldId ); fflush(stdout); */ /* _DEBUG_ */
+	        if (sv_to_ARValue(ctrl, ST(a+1), dataType, &fieldList.fieldValueList[i].value) < 0) {
+	          goto create_entry_end;
+	        }
+		  }else{
+		    char errTxt[256];
+	        sprintf( errTxt, "Failed to fetch field %d from hash", fieldId );
+	        ARError_add(AR_RETURN_ERROR, AP_ERR_FIELD_TYPE);
+	        ARError_add(AR_RETURN_ERROR, AP_ERR_CONTINUE, errTxt );
+	        goto create_entry_end;
+		  }
+	    }
+	    /* printf( "--------------------\n" ); fflush(stdout); */ /* _DEBUG_ */
+
 	    ret = ARCreateEntry(ctrl, schema, &fieldList, entryId, &status);
 #ifdef PROFILE
 	    ((ars_ctrl *)ctrl)->queries++;
@@ -670,11 +771,12 @@ ars_CreateEntry(ctrl,schema,...)
 	    if (! ARError( ret, status)) rv = 1;
 	  create_entry_end:;
 	    if(rv == 0) {
-		RETVAL = newSVsv(&PL_sv_undef);
+	      RETVAL = newSVsv(&PL_sv_undef);
 	    } else {
-		RETVAL = newSVpv( entryId, strlen(entryId) );
+	      RETVAL = newSVpv( entryId, strlen(entryId) );
 	    }
-	  FreeARFieldValueList(&fieldList, FALSE);
+	    FreeARFieldValueList(&fieldList, FALSE);
+	    if( getFieldIds.internalIdList != NULL ) FreeARInternalIdList(&getFieldIds,FALSE);
 	  }
 	}
 	OUTPUT:
@@ -753,7 +855,7 @@ ars_GetEntryBLOB(ctrl,schema,entry_id,field_id,locType,locFile=NULL)
 				goto get_entryblob_end;
 			}
 			loc.locType    = AR_LOC_FILENAME;
-			loc.u.filename = locFile; /* strdup(locFile) ? i'm not completely sure
+			loc.u.filename = strdup(locFile); /* strdup(locFile) ? i'm not completely sure
 							which to use. will FreeARLocStruct call
 							free(loc.locType)? i'm assuming it will.
 							Purify doesnt complain, so i'm going 
@@ -775,11 +877,11 @@ ars_GetEntryBLOB(ctrl,schema,entry_id,field_id,locType,locFile=NULL)
 		if(!ARError(ret, status)) {
 			if(locType == AR_LOC_BUFFER)
 #if PERL_PATCHLEVEL_IS >= 6
-				XPUSHs(sv_2mortal(newSVpv((const char *)
+				XPUSHs(sv_2mortal(newSVpvn((const char *)
 					loc.u.buf.buffer, 
 					loc.u.buf.bufSize)));
 #else
-				XPUSHs(sv_2mortal(newSVpv(
+				XPUSHs(sv_2mortal(newSVpvn(
 					loc.u.buf.buffer, 
 					loc.u.buf.bufSize)));
 #endif
@@ -1092,94 +1194,89 @@ ars_GetListContainer(ctrl,changedSince=0,attributes=0,...)
 	PPCODE:
 	{
 	  ARStatusList 		status;
-	  int          		i, ret;
+	  int          		i, ret, rv = 0;
 
 	  (void) ARError_reset();	  
 	  Zero(&status, 1, ARStatusList);
-#if AR_EXPORT_VERSION >= 4
-	  if(items < 4)
+
+	  if(items < 1 || items > 200){  /* don't overflow clist[] */
 		(void) ARError_add( AR_RETURN_ERROR, AP_ERR_BAD_ARGS);
-	  else {
+	  }else{
 	  	ARContainerTypeList	containerTypes;
 		int			count;
-# if AR_EXPORT_VERSION <= 4L
-		unsigned
-# endif
-		int clist[ARCON_LAST_RESERVED];
-# if AR_EXPORT_VERSION >= 6
+		int clist[256];
 		ARContainerOwnerObjList ownerObjList;
-# else
-		ARContainerOwnerObj 	ownerObj;
-# endif
 # if AR_EXPORT_VERSION >= 8L
 		ARPropList		propList;
 # endif
 		ARContainerInfoList	conList;
 
+		Zero(&containerTypes, 1, ARContainerTypeList);
+		Zero(&ownerObjList, 1, ARContainerOwnerObjList);
+# if AR_EXPORT_VERSION >= 8L
+		Zero(&propList, 1, ARPropList);
+# endif
+		Zero(&conList, 1, ARContainerInfoList);
+
 		count = 0;
-		for(i = 3 ; i < items ; i++) {
+
+		if( items >= 4 ){
+			SV* st3 = ST(3);
+			if( SvROK(st3) && SvTYPE(SvRV(st3)) == SVt_PVAV ){
+				HV *h_dummy = newHV();
+				SvREFCNT_inc( st3 );
+				hv_store( h_dummy, "_", 1, st3, 0 );
+				rv += rev_ARContainerOwnerObjList( ctrl, h_dummy, "_", &ownerObjList );
+				hv_undef( h_dummy );
+			}else{
+				clist[count++] = SvIV(st3);
+			}
+		}
+
+		for(i = 4 ; i < items ; ++i){
 			clist[count++] = SvIV(ST(i));
 		}
 		containerTypes.numItems = count;
 		containerTypes.type = clist; 
-# if AR_EXPORT_VERSION >= 6
-		ownerObjList.numItems = 0;
-		ownerObjList.ownerObjList = NULL;
-# endif
-# if AR_EXPORT_VERSION >= 8L
-		Zero(&propList, 1, ARPropList);
-# endif
-		ret = ARGetListContainer(ctrl, changedSince,
+
+		if( rv == 0 ){
+			ret = ARGetListContainer(ctrl, changedSince,
 					&containerTypes,
 					attributes,
-# if AR_EXPORT_VERSION >= 6
 					&ownerObjList,
-# else
-					&ownerObj, 
-# endif
 # if AR_EXPORT_VERSION >= 8L
-                                        &propList,
+					&propList,
 # endif
-
 					&conList, &status);
-		if(!ARError(ret, status)) {
+		}else{
+			ARError_add( AR_RETURN_ERROR, AP_ERR_PREREVFAIL);
+		}
+
+		if( rv == 0 && !ARError(ret, status)) {
 			unsigned int i;
 		    for(i = 0 ; i < conList.numItems ; i++) {
 	        	HV 			*conInfo = newHV();
-# if AR_EXPORT_VERSION >= 6
 			ARContainerOwnerObjList	 cOwnerObjList;
-# endif
 
 	        	hv_store(conInfo,  "containerType", strlen("containerType") , 
 				newSVpv(ContainerTypeMap[conList.conInfoList[i].type].name, 0), 0);
 	        	hv_store(conInfo,  "containerName", strlen("containerName") , 
 				newSVpv(conList.conInfoList[i].name, 0), 0);
-# if AR_EXPORT_VERSION >= 6
 			cOwnerObjList = conList.conInfoList[i].ownerList;
 			hv_store(conInfo,  "ownerObjList", strlen("ownerObjList") ,
 		     		perl_AROwnerObjList(ctrl, &cOwnerObjList), 0);
-# else
-			hv_store(conInfo,  "ownerType", strlen("ownerType") ,
-		     		newSViv(conList.conInfoList[i].ownerType), 0);
-			hv_store(conInfo,  "ownerName", strlen("ownerName") ,
-		     		newSVpv(conList.conInfoList[i].ownerName,0), 0);
-# endif
 	        	XPUSHs(sv_2mortal(newRV_noinc((SV *)conInfo)));
 		    }
 		}
-# if AR_EXPORT_VERSION >= 5L
-		FreeARContainerTypeList(&containerTypes, FALSE);
-# endif
+        /* Don't try to FreeAR this, because clist[] is a stack variable */ 
+		/* FreeARContainerTypeList(&containerTypes, FALSE); */
+
 		FreeARContainerInfoList(&conList, FALSE);
-# if AR_EXPORT_VERSION >= 6
 		FreeARContainerOwnerObjList(&ownerObjList, FALSE);
-# endif
 # if AR_EXPORT_VERSION >= 8L
 		FreeARPropList(&propList, FALSE);
 # endif
 	  }
-#else
-#endif
 	}
 
 HV *
@@ -1191,58 +1288,52 @@ ars_GetContainer(control,name)
 	  ARStatusList            status;
 	  int                     ret;
 	  ARReferenceTypeList     refTypes;
+	  ARPermissionList        assignedGroupList;
 	  ARPermissionList        groupList;
 	  ARInternalIdList        adminGroupList;
-# if AR_EXPORT_VERSION >= 6
 	  ARContainerOwnerObjList ownerObjList;
-# else
-	  ARContainerOwnerObj     ownerObj;
-# endif
 	  char                   *label = CPNULL;
 	  char                   *description = CPNULL;
 	  unsigned int            type;
 	  ARReferenceList         references;
 	  char                   *helpText = CPNULL;
-# if AR_EXPORT_VERSION >= 6
 	  ARAccessNameType        owner;
-# else
-	  ARNameType              owner;
-# endif
 	  ARTimestamp             timestamp;
-# if AR_EXPORT_VERSION >= 6
 	  ARAccessNameType        lastChanged;
-# else
-	  ARNameType              lastChanged;
-# endif
 	  char                   *changeDiary = CPNULL;
 	  ARPropList              objPropList;
-# if AR_EXPORT_VERSION <= 4L
-	  unsigned 
-# endif
-		int            tlist[] = {ARREF_ALL};
+	  int            tlist[] = {ARREF_ALL};
 	  /* int                     i; */
 	  ARDiaryList             diaryList;
 
 	  (void) ARError_reset();
 	  Zero(&status, 1, ARStatusList);
+	  Zero(&refTypes, 1, ARReferenceTypeList);
+	  Zero(&assignedGroupList, 1, ARPermissionList);
+	  Zero(&groupList, 1, ARPermissionList);
+	  Zero(&adminGroupList, 1, ARInternalIdList);
+	  Zero(&ownerObjList, 1, ARContainerOwnerObjList);
+	  Zero(&references, 1, ARReferenceList);
+	  Zero(owner, 1, ARAccessNameType);
+	  Zero(&timestamp, 1, ARTimestamp);
+	  Zero(&objPropList, 1, ARPropList);
+	  Zero(&diaryList, 1, ARDiaryList);
 
 	  refTypes.numItems = 1;
 	  refTypes.refType = tlist;
 
-	  ret = ARGetContainer(control, name, &refTypes, 
+	  ret = ARGetContainer(control, name,
+			       &refTypes, 
+#if AR_CURRENT_API_VERSION >= 17
+			       &assignedGroupList,
+#endif
 			       &groupList, &adminGroupList,
-# if AR_EXPORT_VERSION >= 6
 			       &ownerObjList, 
-# else
-			       &ownerObj, 
-# endif
 			       &label, &description,
 			       &type, &references, &helpText,
 			       owner, &timestamp, lastChanged, &changeDiary, 
-# if AR_EXPORT_VERSION >= 5L
 			       &objPropList, 
-# endif
-				&status);
+				   &status);
 #ifdef PROFILE
 	  ((ars_ctrl *)control)->queries++;
 #endif
@@ -1253,19 +1344,18 @@ ars_GetContainer(control,name)
 
 	    hv_store(RETVAL,  "objPropList", strlen("objPropList") ,
 		     perl_ARPropList(control, &objPropList), 0);
+#if AR_CURRENT_API_VERSION >= 17
+	    hv_store(RETVAL,  "assignedGroupList", strlen("assignedGroupList") ,
+		     perl_ARPermissionList(control, &assignedGroupList, PERMTYPE_SCHEMA), 0);
+#endif
 	    hv_store(RETVAL,  "groupList", strlen("groupList") ,
 		     perl_ARPermissionList(control, &groupList, PERMTYPE_SCHEMA), 0);
 	    hv_store(RETVAL,  "adminList", strlen("adminList") ,
 		     perl_ARList(control, (ARList *)&adminGroupList, 
 				 (ARS_fn)perl_ARInternalId,
 				 sizeof(ARInternalId)),0);
-# if AR_EXPORT_VERSION >= 6
 	    hv_store(RETVAL,  "ownerObjList", strlen("ownerObjList") ,
 		     perl_AROwnerObjList(control, &ownerObjList), 0);
-# else
-	    hv_store(RETVAL,  "ownerObj", strlen("ownerObj") ,
-		     perl_AROwnerObj(control, &ownerObj), 0);
-# endif
 	    if (helpText)
 	      hv_store(RETVAL,  "helpText", strlen("helpText") , newSVpv(helpText, 0), 0);
 	    hv_store(RETVAL,  "timestamp", strlen("timestamp") , newSViv(timestamp), 0);
@@ -1296,9 +1386,7 @@ ars_GetContainer(control,name)
 
 	    FreeARPermissionList(&groupList,FALSE);
 	    FreeARInternalIdList(&adminGroupList,FALSE);
-# if AR_EXPORT_VERSION >= 6
 	    FreeARContainerOwnerObjList(&ownerObjList,FALSE);
-# endif
 	    FreeARReferenceList(&references,FALSE);
 	    FreeARPropList(&objPropList, FALSE);
 	    if(helpText)
@@ -1355,6 +1443,7 @@ ars_GetActiveLink(ctrl,name)
 	{
 	  int              ret = 0;
 	  unsigned int     order = 0;
+	  ARInternalIdList assignedGroupList;
 	  ARInternalIdList groupList;
 	  unsigned int     executeMask  = 0;
 	  ARInternalId     controlField;
@@ -1377,18 +1466,32 @@ ars_GetActiveLink(ctrl,name)
 	  AMALLOCNN(query,1,ARQualifierStruct);
 
 	  (void) ARError_reset();
+	  Zero(&assignedGroupList, 1, ARInternalIdList);
+	  Zero(&groupList, 1, ARInternalIdList);
 	  Zero(&timestamp, 1, ARTimestamp);
 	  Zero(owner, 1, ARAccessNameType);
 	  Zero(lastChanged, 1, ARAccessNameType);
 	  Zero(&diaryList, 1, ARDiaryList);
 	  Zero(&status, 1, ARStatusList);
+	  Zero(&actionList, 1, ARActiveLinkActionList);
+	  Zero(&elseList, 1, ARActiveLinkActionList);
+	  Zero(&schemaList, 1, ARWorkflowConnectStruct);
+	  Zero(&objPropList, 1, ARPropList);
+
 	  ret = ARGetActiveLink(ctrl, name, &order, 
 				&schemaList,  /* new in 4.5 */
+#if AR_CURRENT_API_VERSION >= 17
+				&assignedGroupList,
+#endif
 				&groupList,
 				&executeMask, &controlField, &focusField,
 				&enable, query, &actionList, &elseList, &helpText,
 				&timestamp, owner, lastChanged, &changeDiary, 
 				&objPropList, /* new in 4.5 */
+#if AR_CURRENT_API_VERSION >= 14
+				NULL,         /* errorActlinkOptions, reserved for future use */
+				NULL,         /* errorActlinkName,    reserved for future use */
+#endif
 				&status);
 #ifdef PROFILE
 	  ((ars_ctrl *)ctrl)->queries++;
@@ -1403,6 +1506,13 @@ ars_GetActiveLink(ctrl,name)
 			perl_ARNameList(ctrl, schemaList.u.schemaList), 0);
 		hv_store(RETVAL,  "objPropList", strlen("objPropList") ,
 			perl_ARPropList(ctrl, &objPropList), 0);
+#if AR_CURRENT_API_VERSION >= 17
+		hv_store(RETVAL,  "assignedGroupList", strlen("assignedGroupList") ,
+		     perl_ARList( ctrl, 
+				 (ARList *)&assignedGroupList,
+				 (ARS_fn)perl_ARInternalId,
+				 sizeof(ARInternalId)), 0);
+#endif
 		hv_store(RETVAL,  "groupList", strlen("groupList") ,
 		     perl_ARList( ctrl, 
 				 (ARList *)&groupList,
@@ -1497,6 +1607,8 @@ ars_GetFilter(ctrl,name)
 	  Zero(lastChanged, 1, ARAccessNameType);
 	  Zero(&diaryList, 1, ARDiaryList);
 	  Zero(&status, 1,ARStatusList);
+	  Zero(&schemaList, 1, ARWorkflowConnectStruct);
+	  Zero(&objPropList, 1, ARPropList);
 #if AR_CURRENT_API_VERSION >= 13
 	  Zero(&errorFilterName, 1,ARNameType);
 #endif
@@ -1882,11 +1994,8 @@ ars_GetSchema(ctrl,name)
 	{
 	  ARStatusList         status;
 	  int                  ret = 0;
-#if AR_EXPORT_VERSION >= 3
+	  ARPermissionList     assignedGroupList;
 	  ARPermissionList     groupList;
-#else
-	  ARInternalIdList     groupList;
-#endif
 #if AR_EXPORT_VERSION >= 8L
 	  ARSchemaInheritanceList inheritanceList;
 	  ARArchiveInfoStruct infoStruct;
@@ -1903,19 +2012,15 @@ ars_GetSchema(ctrl,name)
 	  ARAccessNameType           lastChanged;
 	  char                *changeDiary = CPNULL;
 	  ARDiaryList          diaryList;
-#if AR_EXPORT_VERSION >= 3
 	  ARCompoundSchema     schema;
 	  ARSortList           sortList;
-#endif
-#if AR_EXPORT_VERSION >= 5
 	  ARPropList           objPropList;
-#endif
-#if AR_EXPORT_VERSION >= 6
 	  ARNameType           defaultVui;
-#endif
 
 	  (void) ARError_reset();
 	  Zero(&status, 1,  ARStatusList);
+	  Zero(&assignedGroupList, 1, ARPermissionList);
+	  Zero(&groupList, 1, ARPermissionList);
 	  Zero(&adminGroupList, 1, ARInternalIdList);
 	  Zero(&getListFields, 1, AREntryListFieldList);
 	  Zero(&indexList, 1, ARIndexList);
@@ -1923,9 +2028,10 @@ ars_GetSchema(ctrl,name)
 	  Zero(owner, 1, ARAccessNameType);
 	  Zero(lastChanged, 1, ARAccessNameType);
 	  Zero(&diaryList, 1, ARDiaryList);
-#if AR_EXPORT_VERSION >= 6
+	  Zero(&schema, 1, ARCompoundSchema);
+	  Zero(&sortList, 1, ARSortList);
+	  Zero(&objPropList, 1, ARPropList);
 	  Zero(&defaultVui, 1, ARNameType);
-#endif
 #if AR_EXPORT_VERSION >= 8L
 	  Zero(&inheritanceList, 1, ARSchemaInheritanceList);
 	  Zero(&infoStruct, 1, ARArchiveInfoStruct);
@@ -1935,10 +2041,13 @@ ars_GetSchema(ctrl,name)
 #endif
 	  RETVAL = newHV();
 	  sv_2mortal( (SV*) RETVAL );
-#if AR_EXPORT_VERSION >= 3
+
 	  ret = ARGetSchema(ctrl, name, &schema, 
 #if AR_EXPORT_VERSION >= 8L
-                            &inheritanceList,
+                &inheritanceList,
+#endif
+#if AR_CURRENT_API_VERSION >= 17
+			    &assignedGroupList,
 #endif
 			    &groupList, &adminGroupList, &getListFields, 
 			    &sortList, &indexList, 
@@ -1948,18 +2057,11 @@ ars_GetSchema(ctrl,name)
 #if AR_EXPORT_VERSION >= 9L
                             &auditInfo,
 #endif
-# if AR_EXPORT_VERSION >= 6
 			    defaultVui,
-# endif
 			    &helpText, &timestamp, owner, 
 			    lastChanged, &changeDiary, 
-# if AR_EXPORT_VERSION >= 5
 			    &objPropList,
-# endif
 			    &status);
-#else
-	  ret = ARGetSchema(ctrl, name, &groupList, &adminGroupList, &getListFields, &indexList, &helpText, &timestamp, owner, lastChanged, &changeDiary, &status);
-#endif
 #ifdef PROFILE
 	  ((ars_ctrl *)ctrl)->queries++;
 #endif
@@ -1972,15 +2074,12 @@ ars_GetSchema(ctrl,name)
 		hv_store(RETVAL, "defaultVui", strlen("defaultVui"),
 			newSVpv(defaultVui, 0), 0);			
 #endif
-#if AR_EXPORT_VERSION >= 3
+#if AR_CURRENT_API_VERSION >= 17
+	    hv_store(RETVAL,  "assignedGroupList", strlen("assignedGroupList") ,
+		     perl_ARPermissionList(ctrl, &assignedGroupList, PERMTYPE_SCHEMA), 0);
+#endif
 	    hv_store(RETVAL,  "groupList", strlen("groupList") ,
 		     perl_ARPermissionList(ctrl, &groupList, PERMTYPE_SCHEMA), 0);
-#else
-	    hv_store(RETVAL,  "groupList", strlen("groupList") ,
-		     perl_ARList(ctrl, (ARList *)&groupList, 
-				 (ARS_fn)perl_ARInternalId,
-				 sizeof(ARInternalId)),0);
-#endif
 	    hv_store(RETVAL,  "adminList", strlen("adminList") ,
 		     perl_ARList(ctrl, (ARList *)&adminGroupList, 
 				 (ARS_fn)perl_ARInternalId,
@@ -2001,11 +2100,7 @@ ars_GetSchema(ctrl,name)
 		     newSVpv(lastChanged, 0), 0);
 	    hv_store(RETVAL,  "name", strlen("name") , newSVpv(name, 0), 0);
 	    if (changeDiary) {
-#if AR_EXPORT_VERSION >= 4
 		ret = ARDecodeDiary(ctrl, changeDiary, &diaryList, &status);
-#else
-		ret = ARDecodeDiary(changeDiary, &diaryList, &status);
-#endif
 		if (!ARError(ret, status)) {
 			hv_store(RETVAL,  "changeDiary", strlen("changeDiary") ,
 				perl_ARList(ctrl, (ARList *)&diaryList,
@@ -2014,7 +2109,7 @@ ars_GetSchema(ctrl,name)
 			FreeARDiaryList(&diaryList, FALSE);
 		}
 	    }
-#if AR_EXPORT_VERSION >= 3
+
 	    hv_store(RETVAL,  "schema", strlen("schema") , 
 			perl_ARCompoundSchema(ctrl, &schema), 0);
 	    hv_store(RETVAL,  "sortList", strlen("sortList") , 
@@ -2027,12 +2122,7 @@ ars_GetSchema(ctrl,name)
 	    hv_store(RETVAL, "auditInfo", strlen("auditInfo") , 
 			perl_ARAuditInfoStruct(ctrl, &auditInfo), 0);
 #endif
-#endif
-#if AR_EXPORT_VERSION >= 3
 	    FreeARPermissionList(&groupList,FALSE);
-#else
-	    FreeARInternalIdList(&groupList,FALSE);
-#endif
 	    FreeARInternalIdList(&adminGroupList,FALSE);
 	    FreeAREntryListFieldList(&getListFields,FALSE);
 	    FreeARIndexList(&indexList,FALSE);
@@ -2042,10 +2132,8 @@ ars_GetSchema(ctrl,name)
 	    if(changeDiary) {
 	      	AP_FREE(changeDiary);
 	    }
-#if AR_EXPORT_VERSION >= 3
 	    FreeARCompoundSchema(&schema,FALSE);
 	    FreeARSortList(&sortList,FALSE);
-#endif
 	  }
 	}
 	OUTPUT:
@@ -2096,10 +2184,11 @@ ars_GetField(ctrl,schema,id)
 	  int                   ret;
 	  ARStatusList          Status;
 	  unsigned int          dataType, option, createMode;
-#if AR_EXPORT_VERSION >= 9L
+#if AR_CURRENT_API_VERSION >= 12
 	  unsigned int          fieldOption;
 #endif
 	  ARValueStruct         defaultVal;
+	  ARPermissionList      assignedGroupList;
 	  ARPermissionList      permissions;
 	  ARFieldLimitStruct    limit;
 	  ARNameType            fieldName;
@@ -2111,10 +2200,12 @@ ars_GetField(ctrl,schema,id)
 	  ARAccessNameType            lastChanged;
 	  char                 *changeDiary = CPNULL;
 	  ARDiaryList           diaryList;
+	  ARPropList            objPropList;
 
 	  (void) ARError_reset();
 	  Zero(&Status,      1, ARStatusList);
 	  Zero(&defaultVal,  1, ARValueStruct);
+	  Zero(&assignedGroupList, 1, ARPermissionList);
 	  Zero(&permissions, 1, ARPermissionList);
 	  Zero(&limit,       1, ARFieldLimitStruct);
 
@@ -2126,10 +2217,13 @@ ars_GetField(ctrl,schema,id)
 	  Zero(owner,        1, ARAccessNameType);
 	  Zero(lastChanged,  1, ARAccessNameType);
 	  Zero(&diaryList,   1, ARDiaryList);
-#if AR_EXPORT_VERSION >= 9
-	  ret = ARGetFieldCached(ctrl, schema, id, fieldName, &fieldMap, &dataType, &option, &createMode, &fieldOption, &defaultVal, NULL /* &permissions */, &limit, &displayList, &helpText, &timestamp, owner, lastChanged, &changeDiary, &Status);
+	  Zero(&objPropList, 1, ARPropList);
+#if AR_CURRENT_API_VERSION >= 17
+	  ret = ARGetFieldCached(ctrl, schema, id, fieldName, &fieldMap, &dataType, &option, &createMode, &fieldOption, &defaultVal, &assignedGroupList, &permissions, &limit, &displayList, &helpText, &timestamp, owner, lastChanged, &changeDiary, &objPropList, &Status);
+#elif AR_CURRENT_API_VERSION >= 12
+	  ret = ARGetFieldCached(ctrl, schema, id, fieldName, &fieldMap, &dataType, &option, &createMode, &fieldOption, &defaultVal, &permissions, &limit, &displayList, &helpText, &timestamp, owner, lastChanged, &changeDiary, &Status);
 #else
-	  ret = ARGetFieldCached(ctrl, schema, id, fieldName, &fieldMap, &dataType, &option, &createMode, &defaultVal, NULL /* &permissions */, &limit, &displayList, &helpText, &timestamp, owner, lastChanged, &changeDiary, &Status);
+	  ret = ARGetFieldCached(ctrl, schema, id, fieldName, &fieldMap, &dataType, &option, &createMode, &defaultVal, &permissions, &limit, &displayList, &helpText, &timestamp, owner, lastChanged, &changeDiary, &Status);
 #endif
 #ifdef PROFILE
 	  ((ars_ctrl *)ctrl)->queries++;
@@ -2145,14 +2239,20 @@ ars_GetField(ctrl,schema,id)
 	      hv_store(RETVAL,  "createMode", strlen("createMode") ,
 		       newSVpv("protected",0), 0);
 	    hv_store(RETVAL,  "option", strlen("option") , newSViv(option), 0);
-#if AR_EXPORT_VERSION >= 9
+#if AR_CURRENT_API_VERSION >= 12
 	    hv_store(RETVAL,  "fieldOption", strlen("fieldOption") , newSViv(fieldOption), 0);
 #endif
 	    hv_store(RETVAL,  "dataType", strlen("dataType") ,
 		     perl_dataType_names(ctrl, &dataType), 0);
 	    hv_store(RETVAL,  "defaultVal", strlen("defaultVal") ,
 		     perl_ARValueStruct(ctrl, &defaultVal), 0);
-	    /* permissions below */
+#if AR_CURRENT_API_VERSION >= 17
+	    hv_store(RETVAL,  "assignedGroupList", strlen("assignedGroupList") , 
+		     perl_ARPermissionList(ctrl, &assignedGroupList, PERMTYPE_FIELD), 0);
+#endif
+	    hv_store(RETVAL,  "permissions", strlen("permissions") , 
+		     perl_ARPermissionList(ctrl, &permissions, PERMTYPE_FIELD), 0);
+
 	    hv_store(RETVAL,  "limit", strlen("limit") , 
 		     perl_ARFieldLimitStruct(ctrl, &limit), 0);
 	    hv_store(RETVAL,  "fieldName", strlen("fieldName") , 
@@ -2188,27 +2288,110 @@ ars_GetField(ctrl,schema,id)
 	    if(changeDiary) {
 	      	AP_FREE(changeDiary);
 	    }
-#if AR_EXPORT_VERSION >= 9L
-	    ret = ARGetField(ctrl, schema, id, NULL, NULL, NULL, NULL, NULL, NULL, NULL, &permissions, NULL, NULL, NULL, NULL, NULL, NULL, NULL, &Status);
-#else
-	    ret = ARGetField(ctrl, schema, id, NULL, NULL, NULL, NULL, NULL, NULL, &permissions, NULL, NULL, NULL, NULL, NULL, NULL, NULL, &Status);
-#endif
-#ifdef PROFILE
-	    ((ars_ctrl *)ctrl)->queries++;
-#endif
-	    if (ret == 0) {
-	      hv_store(RETVAL,  "permissions", strlen("permissions") , 
-		       perl_ARPermissionList(ctrl, &permissions, PERMTYPE_FIELD), 0);
-	      FreeARPermissionList(&permissions,FALSE);
-            } else {
-	      FreeARStatusList(&Status, FALSE);
-            } 
 	  }else{
 	   XSRETURN_UNDEF;
 	  }
 	}
 	OUTPUT:
 	RETVAL
+
+
+HV*
+ars_GetImage(ctrl,name)
+	ARControlStruct *       ctrl
+    ARNameType              name
+	CODE:
+	{
+	  ARStatusList         status;
+#if AR_CURRENT_API_VERSION >= 14
+	  unsigned int         enable =  0;
+	  ARImageDataStruct    content;
+	  char                *imageType;
+	  ARTimestamp          timestamp;
+	  char                *checkSum = CPNULL;
+	  char                *description = CPNULL;
+	  char                *helpText    = CPNULL;
+	  ARAccessNameType     owner;
+	  ARAccessNameType     lastChanged;
+      char                *changeDiary = CPNULL;
+	  ARPropList           objPropList;
+	  ARDiaryList           diaryList;
+	  int                  ret;
+
+	  (void) ARError_reset();
+	  Zero(&status, 1,ARStatusList);
+	  Zero(&content, 1, ARImageDataStruct);
+	  Zero(&timestamp, 1, ARTimestamp);
+	  Zero(owner, 1, ARAccessNameType);
+	  Zero(&objPropList, 1, ARPropList);
+	  Zero(&diaryList,   1, ARDiaryList);
+
+	  ret = ARGetImage(ctrl, name, 
+		 		&content,
+		 		&imageType,
+		 		&timestamp,
+		 		&checkSum,
+		 		&description,
+		 		&helpText,
+		 		owner,
+		 		lastChanged,
+		 		&changeDiary,
+		 		&objPropList,
+		 		&status );
+
+	  if(!ARError( ret, status)) {
+	  	RETVAL = newHV();
+	    sv_2mortal( (SV*) RETVAL );
+	    hv_store(RETVAL,  "name", strlen("name"), newSVpv(name, 0), 0);
+		hv_store(RETVAL,  "imageData", strlen("imageData"),
+			perl_ARImageDataStruct(ctrl, &content), 0);
+	    hv_store(RETVAL,  "imageType", strlen("imageType"), newSVpv(imageType, 0), 0);
+		hv_store(RETVAL,  "objPropList", strlen("objPropList") ,
+			perl_ARPropList(ctrl, &objPropList), 0);
+	    hv_store(RETVAL,  "timestamp", strlen("timestamp") , newSViv(timestamp), 0);
+	    hv_store(RETVAL,  "checkSum", strlen("checkSum") , newSVpv(checkSum, 0), 0);
+	    if( description ){
+	      hv_store(RETVAL,  "description", strlen("description") , newSVpv(description, 0), 0);
+	    }
+	    if( helpText ){
+	      hv_store(RETVAL,  "helpText", strlen("helpText") , newSVpv(helpText, 0), 0);
+	    }
+	    hv_store(RETVAL,  "owner", strlen("owner") , newSVpv(owner, 0), 0);
+	    hv_store(RETVAL,  "lastChanged", strlen("lastChanged") , newSVpv(lastChanged, 0), 0);
+	    if( changeDiary ){
+		  ret = ARDecodeDiary(ctrl, changeDiary, &diaryList, &status);
+		  if (!ARError(ret, status)) {
+			hv_store(RETVAL,  "changeDiary", strlen("changeDiary") ,
+				perl_ARList(ctrl, 
+				(ARList *)&diaryList,
+				(ARS_fn)perl_diary,
+				sizeof(ARDiaryStruct)), 0);
+			FreeARDiaryList(&diaryList, FALSE);
+		  }
+	    }
+
+	    if(helpText)    {  AP_FREE(helpText);  }
+	    if(changeDiary) {  AP_FREE(changeDiary);  }
+	    if(imageType)   {  AP_FREE(imageType);  }
+	    if(checkSum)    { 	AP_FREE(checkSum);  }
+	    if(description) {  AP_FREE(description);  }
+	    FreeARImageDataStruct(&content, FALSE);
+	    FreeARPropList(&objPropList, FALSE);
+	  }else{
+	    XSRETURN_UNDEF;
+	  }
+#else	/* prior to ARS 7.5 */
+	  (void) ARError_reset();
+	  Zero(&status, 1, ARStatusList);
+	  (void) ARError_add( AR_RETURN_ERROR, AP_ERR_DEPRECATED,
+	  "ars_GetImage() is only available in ARS >= 7.5");
+	  XSRETURN_UNDEF;
+#endif
+	}
+	OUTPUT:
+	RETVAL
+
+
 
 int
 ars_SetEntry(ctrl,schema,entry_id,getTime,...)
@@ -2221,16 +2404,18 @@ ars_SetEntry(ctrl,schema,entry_id,getTime,...)
 	  int              a = 0, i = 0, c = (items - 4) / 2;
 	  int              offset = 4;
 	  ARFieldValueList fieldList;
+	  ARInternalIdList getFieldIds;
 	  ARStatusList     status;
 	  int              ret = 0;
-	  unsigned int     dataType = 0;
-#if AR_EXPORT_VERSION >= 3
+	  unsigned int     dataType = 0, j = 0;
 	  unsigned int     option = AR_JOIN_SETOPTION_NONE;
-	  AREntryIdList   entryList;
+	  AREntryIdList    entryList;
+	  HV              *cacheFields;
 
 	  (void) ARError_reset();
 	  Zero(&status, 1,ARStatusList);
 	  Zero(&fieldList, 1, ARFieldValueList);
+	  Zero(&getFieldIds, 1, ARInternalIdList);
 	  Zero(&entryList, 1,AREntryIdList);
 	  RETVAL = 0; /* assume error */
 	  if ((items - 4) % 2) {
@@ -2241,68 +2426,92 @@ ars_SetEntry(ctrl,schema,entry_id,getTime,...)
 	    (void) ARError_add( AR_RETURN_ERROR, AP_ERR_BAD_ARGS);
 	    goto set_entry_exit;
 	  }
-#else
-	  (void) ARError_reset();
-	  RETVAL = 0; /* assume error */
-	  if (((items - 4) % 2) || c < 1) {
-	    (void) ARError_add( AR_RETURN_ERROR, AP_ERR_BAD_ARGS);
+
+	  cacheFields = fieldcache_get_schema_fields( ctrl, schema, FALSE );
+	  if( ! cacheFields ){
 	    goto set_entry_exit;
 	  }
-#endif
+
 	  fieldList.numItems = c;
 	  AMALLOCNN(fieldList.fieldValueList,c,ARFieldValueStruct);
+
+	  getFieldIds.numItems = 0;
+	  getFieldIds.internalIdList = NULL;
+
 	  for (i=0; i<c; i++) {
+	    ARInternalId fieldId;
 	    a = i*2+offset;
-	    fieldList.fieldValueList[i].fieldId = SvIV(ST(a));
+	    fieldId = fieldList.fieldValueList[i].fieldId = SvIV(ST(a));
 	    
 	    if (! SvOK(ST(a+1))) {
 	      /* pass a NULL */
 	      fieldList.fieldValueList[i].value.dataType = AR_DATA_TYPE_NULL;
-	    } else {
+	    }else{
 	      /* determine data type and pass value */
-#if AR_EXPORT_VERSION >= 9
-	      ret = ARGetFieldCached(ctrl, schema, fieldList.fieldValueList[i].fieldId, NULL, NULL, &dataType, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, &status);
-#elif AR_EXPORT_VERSION >= 3
-	      ret = ARGetFieldCached(ctrl, schema, fieldList.fieldValueList[i].fieldId, NULL, NULL, &dataType, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, &status);
-#else
-	      ret = ARGetFieldCached(ctrl, schema, fieldList.fieldValueList[i].fieldId, &dataType, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, &status);
-#endif
-	      if (ARError( ret, status)) {
-		FreeARFieldValueList(&fieldList, FALSE);
-		goto set_entry_end;
-	      }
-	      if (sv_to_ARValue(ctrl, ST(a+1), dataType, 
-			&fieldList.fieldValueList[i].value) < 0) {
-		FreeARFieldValueList(&fieldList, FALSE);
-		goto set_entry_end;
-	      }
+	      dataType = fieldcache_get_data_type( cacheFields, fieldId );
+	      if (dataType <= AR_DATA_TYPE_MAX_TYPE) {
+	        if (sv_to_ARValue(ctrl, ST(a+1), dataType, &fieldList.fieldValueList[i].value) < 0) {
+		      goto set_entry_end;
+	        }
+	      }else{
+	    	   if( getFieldIds.numItems == 0 ){
+	          AMALLOCNN(getFieldIds.internalIdList,c,ARInternalId);
+	        }
+	        /* printf( "%s [%d] collect for loading\n", schema, fieldId ); fflush(stdout); */ /* _DEBUG_ */
+            getFieldIds.internalIdList[getFieldIds.numItems] = fieldId;
+	        ++getFieldIds.numItems;
+	    	 }
 	    }
 	  }
-#if AR_EXPORT_VERSION >= 3
+
+	  /* load missing fields into cache */
+	  if( getFieldIds.numItems > 0 ){
+	    /* printf( "--- load missing fields ---\n" ); fflush(stdout); */ /* _DEBUG_ */
+	    /* if( fieldcache_load_schema(ctrl,schema,&getFieldIds,NULL) != AR_RETURN_OK ){ */
+	    if( fieldcache_load_schema(ctrl,schema,&getFieldIds,NULL) > AR_RETURN_WARNING ){
+	      goto set_entry_end;
+	    }
+	  }
+
+	  /* now get data type from the freshly cached fields */
+	  i = 0;
+	  for (j=0; j<getFieldIds.numItems; ++j) {
+	    ARInternalId fieldId = getFieldIds.internalIdList[j];
+	    while(fieldId != fieldList.fieldValueList[i].fieldId) ++i;
+	    a = i*2+offset;
+
+	    dataType = fieldcache_get_data_type( cacheFields, fieldId );
+	    if (dataType <= AR_DATA_TYPE_MAX_TYPE) {
+	      /* printf( "%s [%d] freshly loaded\n", schema, fieldId ); fflush(stdout); */ /* _DEBUG_ */
+	      if (sv_to_ARValue(ctrl, ST(a+1), dataType, &fieldList.fieldValueList[i].value) < 0) {
+	        goto set_entry_end;
+	      }
+		}else{
+		  char errTxt[256];
+	      sprintf( errTxt, "Failed to fetch field %d from hash", fieldId );
+	      ARError_add(AR_RETURN_ERROR, AP_ERR_FIELD_TYPE);
+	      ARError_add(AR_RETURN_ERROR, AP_ERR_CONTINUE, errTxt );
+	      goto set_entry_end;
+		}
+	  }
+	  /* printf( "--------------------\n" ); fflush(stdout); */ /* _DEBUG_ */
+
+
 	  /* build entryList */
 	  if(perl_BuildEntryList(ctrl, &entryList, entry_id) != 0){
-		FreeARFieldValueList(&fieldList, FALSE);
 		goto set_entry_end;
 	  }
 
 	  ret = ARSetEntry(ctrl, schema, &entryList, &fieldList, getTime, option, &status);
 	  FreeAREntryIdList(&entryList, FALSE);
-#else /* ARS2.x */
-	  if(!entry_id || !*entry_id) {
-		ARError_add( AR_RETURN_ERROR, AP_ERR_BAD_EID);
-		FreeARFieldValueList(&fieldList, FALSE);
-		goto set_entry_end;
-	  }
-	  ret = ARSetEntry(ctrl, schema, entry_id, &fieldList, getTime, &status);
-#endif
 #ifdef PROFILE
 	  ((ars_ctrl *)ctrl)->queries++;
 #endif
 	  if (! ARError( ret, status)) {
 	    RETVAL = 1;
 	  }
-	  FreeARFieldValueList(&fieldList, FALSE);
 	set_entry_end:;
+	  FreeARFieldValueList(&fieldList, FALSE);
 	set_entry_exit:;
 	}
 	OUTPUT:
@@ -2319,6 +2528,9 @@ ars_Export(ctrl,displayTag,vuiType,...)
 		ARStructItemList structItems;
 		char            *buf = CPNULL;
 		ARStatusList     status;
+#if AR_CURRENT_API_VERSION >= 17
+		unsigned int     exportOption = AR_EXPORT_DEFAULT;   /* TODO: support this as ars_Export() argument */
+#endif
 #if AR_EXPORT_VERSION >= 8L
 		ARWorkflowLockStruct workflowLockStruct;
 #endif
@@ -2350,10 +2562,12 @@ ars_Export(ctrl,displayTag,vuiType,...)
 					ok = 0;
 				} else {
 					structItems.structItemList[i].type = et;
+					/* printf( "structItems.structItemList[i].type <%d>\n", structItems.structItemList[i].type ); */ /* _DEBUG_ */
 					strncpy(structItems.structItemList[i].name,
 						SvPV(ST(a+1), PL_na), 
 						sizeof(ARNameType) );
 					structItems.structItemList[i].name[sizeof(ARNameType)-1] = '\0';
+					/* printf( "structItems.structItemList[i].name <%s>\n", structItems.structItemList[i].name ); */ /* _DEBUG_ */
 				}
 			}
 		}
@@ -2367,6 +2581,9 @@ ars_Export(ctrl,displayTag,vuiType,...)
 #if AR_EXPORT_VERSION >= 6
 				       vuiType,
 #endif
+#if AR_CURRENT_API_VERSION >= 17
+					   exportOption,	
+#endif
 #if AR_EXPORT_VERSION >= 8L
 					   &workflowLockStruct,
 #endif
@@ -2378,7 +2595,7 @@ ars_Export(ctrl,displayTag,vuiType,...)
 				RETVAL = newSVpv(buf, 0);
 			}
 		} 
-		if(buf) free(buf);
+		if(buf) AP_FREE(buf);
 		FreeARStructItemList(&structItems, FALSE);
 	}
 	OUTPUT:
@@ -2391,8 +2608,9 @@ ars_Import(ctrl,importOption=AR_IMPORT_OPT_CREATE,importBuf,...)
 	unsigned int            importOption
 	CODE:
 	{
-		int               ret = 1, i = 0, a = 0, c = (items - 2) / 2, ok =1;
+		int               ret = 1, i = 0, a = 0, c = (items - 2) / 2, ok = 1;
 		ARStructItemList *structItems = NULL;
+		char             *objectModificationLogLabel = NULL;
 		ARStatusList      status;
 
 		(void) ARError_reset();	  
@@ -2400,6 +2618,7 @@ ars_Import(ctrl,importOption=AR_IMPORT_OPT_CREATE,importBuf,...)
 		RETVAL = 0;
 		if ((items-3) % 2) {
 			(void) ARError_add( AR_RETURN_ERROR, AP_ERR_BAD_ARGS);
+			ok = 0;
 		} else {
 			if (c > 0) {
 				AMALLOCNN(structItems, c, ARStructItemList);
@@ -2434,6 +2653,9 @@ ars_Import(ctrl,importOption=AR_IMPORT_OPT_CREATE,importBuf,...)
 #if AR_EXPORT_VERSION >= 5
 				       importOption,
 #endif
+#if AR_CURRENT_API_VERSION >= 17
+				       objectModificationLogLabel,
+#endif
 				       &status);
 #ifdef PROFILE
 			((ars_ctrl *)ctrl)->queries++;
@@ -2444,7 +2666,7 @@ ars_Import(ctrl,importOption=AR_IMPORT_OPT_CREATE,importBuf,...)
 				RETVAL = 1;
 			}
 		} else {
-			RETVAL = 1;
+			RETVAL = 0;
 		}
 		FreeARStructItemList(structItems, TRUE);
 	}
@@ -2460,9 +2682,11 @@ ars_GetListFilter(control,schema=NULL,changedsince=0)
 	{
 	  ARNameList   nameList;
 	  ARStatusList status;
+#if AR_EXPORT_VERSION >= 8L
 	  ARPropList   propList;
+#endif
 	  int          ret = 0;
-          unsigned int i = 0;
+	  unsigned int i = 0;
 
 	  (void) ARError_reset();
 #if AR_EXPORT_VERSION >= 8L
@@ -2496,7 +2720,7 @@ ars_GetListEscalation(control,schema=NULL,changedsince=0)
 	  ARStatusList status;
 	  ARPropList   propList;
 	  int          ret = 0;
-          unsigned int i = 0;
+	  unsigned int i = 0;
 
 	  (void) ARError_reset();
 #if AR_EXPORT_VERSION >= 8L
@@ -2559,6 +2783,79 @@ ars_GetListCharMenu(control,changedsince=0)
 	  }
 	}
 
+void
+ars_GetListImage(ctrl,schema=NULL,changedSince=0,imageType=NULL)
+	ARControlStruct *       ctrl
+    SV *                    schema
+	ARTimestamp		           changedSince
+	char *                  imageType
+	PPCODE:
+	{
+	  ARStatusList     status;
+#if AR_CURRENT_API_VERSION >= 14
+	  ARNameList       schemaList;
+	  ARNameList      *schemaListPtr = NULL;
+	  ARNameList       nameList;
+	  ARPropList       propList;
+	  int              ret = 0, rv = 0;
+	  unsigned int     i = 0;
+
+	  (void) ARError_reset();
+	  Zero(&propList, 1, ARPropList);
+	  Zero(&schemaList, 1, ARNameList);
+	  Zero(&nameList, 1, ARNameList);
+	  Zero(&status, 1,ARStatusList);
+
+	  if( schema == NULL ){
+	    /* do nothing */
+	  }else if( SvROK(schema) && SvTYPE(SvRV(schema)) == SVt_PVAV ){
+	    HV *h_dummy = newHV();
+	    SvREFCNT_inc( schema );
+	    hv_store( h_dummy, "_", 1, schema, 0 );
+	    rv += rev_ARNameList( ctrl, h_dummy, "_", &schemaList );
+	    hv_undef( h_dummy );
+	    schemaListPtr = &schemaList;
+	  }else if( SvPOK(schema) ){
+	    STRLEN len = 0;
+	    char *str = SvPV( schema, len );
+	    if( len > 0 ){
+	      schemaList.numItems = 1;
+	      schemaList.nameList = (ARNameType*) MALLOCNN(sizeof(ARNameType) * 1);
+	      strncpy( schemaList.nameList[0], str, AR_MAX_NAME_SIZE );
+	    }
+	    schemaListPtr = &schemaList;
+	  }
+
+	  if( rv == 0 ){
+	    ret = ARGetListImage( ctrl,
+	    		    schemaListPtr,
+	    		    changedSince,
+	    		    imageType,
+	    		    &nameList,
+	    		    &status );
+	  }else{
+		  ARError_add( AR_RETURN_ERROR, AP_ERR_PREREVFAIL);
+	  }
+
+	  if (rv == 0 && !ARError( ret,status)) {
+	    for (i=0; i < nameList.numItems; i++){
+	      XPUSHs(sv_2mortal(newSVpv(nameList.nameList[i], 0)));
+	    }
+	    FreeARNameList(&nameList,FALSE);
+	  }
+	  FreeARNameList(&schemaList,FALSE);
+#else	/* prior to ARS 7.5 */
+	  (void) ARError_reset();
+	  Zero(&status, 1, ARStatusList);
+	  (void) ARError_add( AR_RETURN_ERROR, AP_ERR_DEPRECATED,
+	  "ars_GetListImage() is only available in ARS >= 7.5");
+#endif
+	}
+
+
+
+
+
 
 int
 ars_DeleteActiveLink(ctrl, name)
@@ -2566,6 +2863,7 @@ ars_DeleteActiveLink(ctrl, name)
 	char *			name
 	CODE:
 	{
+	  char        *objectModificationLogLabel = NULL;
 	  ARStatusList status;
 	  int          ret = 0;
 
@@ -2576,6 +2874,9 @@ ars_DeleteActiveLink(ctrl, name)
 		ret = ARDeleteActiveLink(ctrl, name, 
 #if AR_EXPORT_VERSION >= 8L
                                          0,
+#endif
+#if AR_CURRENT_API_VERSION >= 17
+                                         objectModificationLogLabel,
 #endif
                                          &status);
 #ifdef PROFILE
@@ -2606,7 +2907,9 @@ ars_DeleteVUI(ctrl, schema, vuiId)
 	  RETVAL = 0;
 #if AR_EXPORT_VERSION >= 3
 	  if(ctrl && CVLD(schema)) {
-		ret = ARDeleteVUI(ctrl, schema, vuiId, &status);
+		ret = ARDeleteVUI(ctrl, schema,
+		        vuiId,
+		        &status);
 #ifdef PROFILE
 	        ((ars_ctrl *)ctrl)->queries++;
 #endif
@@ -2630,6 +2933,7 @@ ars_DeleteCharMenu(ctrl, name)
 	char *			name
 	CODE:
 	{
+	  char        *objectModificationLogLabel = NULL;
 	  ARStatusList status;
 	  int          ret = 0;
 
@@ -2640,6 +2944,9 @@ ars_DeleteCharMenu(ctrl, name)
 		ret = ARDeleteCharMenu(ctrl, name, 
 #if AR_EXPORT_VERSION >= 8L
                                        0,
+#endif
+#if AR_CURRENT_API_VERSION >= 17
+                                       objectModificationLogLabel,
 #endif
                                        &status);
 #ifdef PROFILE
@@ -2661,6 +2968,7 @@ ars_DeleteEscalation(ctrl, name)
 	char *			name
 	CODE:
 	{
+	  char        *objectModificationLogLabel = NULL;
 	  ARStatusList status;
 	  int          ret = 0;
 
@@ -2671,6 +2979,9 @@ ars_DeleteEscalation(ctrl, name)
 		ret = ARDeleteEscalation(ctrl, name, 
 #if AR_EXPORT_VERSION >= 8L
                                          0,
+#endif
+#if AR_CURRENT_API_VERSION >= 17
+                                         objectModificationLogLabel,
 #endif
                                          &status);
 #ifdef PROFILE
@@ -2701,7 +3012,10 @@ ars_DeleteField(ctrl, schema, fieldId, deleteOption=0)
 	  Zero(&status, 1,ARStatusList);
 	  RETVAL = 0;
 	  if(ctrl && CVLD(schema) && IVLD(deleteOption, 0, 2)) {
-		ret = ARDeleteField(ctrl, schema, fieldId, deleteOption, &status);
+		ret = ARDeleteField(ctrl, schema,
+		        fieldId,
+		        deleteOption,
+		        &status);
 #ifdef PROFILE
 	        ((ars_ctrl *)ctrl)->queries++;
 #endif
@@ -2721,6 +3035,7 @@ ars_DeleteFilter(ctrl, name)
 	char *			name
 	CODE:
 	{
+	  char        *objectModificationLogLabel = NULL;
 	  ARStatusList status;
 	  int          ret = 0;
 
@@ -2731,6 +3046,9 @@ ars_DeleteFilter(ctrl, name)
 		ret = ARDeleteFilter(ctrl, name, 
 #if AR_EXPORT_VERSION >= 8L
                                      0,
+#endif
+#if AR_CURRENT_API_VERSION >= 17
+                                     objectModificationLogLabel,
 #endif
                                      &status);
 #ifdef PROFILE
@@ -2752,6 +3070,7 @@ ars_DeleteContainer(ctrl, name)
 	char *			name
 	CODE:
 	{
+	  char        *objectModificationLogLabel = NULL;
 	  ARStatusList status;
 	  int          ret = 0;
 
@@ -2762,6 +3081,9 @@ ars_DeleteContainer(ctrl, name)
 		ret = ARDeleteContainer( ctrl, name, 
 #if AR_EXPORT_VERSION >= 8L
                                      0,
+#endif
+#if AR_CURRENT_API_VERSION >= 17
+                                     objectModificationLogLabel,
 #endif
                                      &status);
 #ifdef PROFILE
@@ -2784,6 +3106,7 @@ ars_DeleteSchema(ctrl, name, deleteOption)
 	unsigned int 		deleteOption
 	CODE:
 	{
+	  char        *objectModificationLogLabel = NULL;
 	  ARStatusList status;
 	  int          ret = 0;
 
@@ -2791,7 +3114,12 @@ ars_DeleteSchema(ctrl, name, deleteOption)
 	  Zero(&status, 1, ARStatusList);
 	  RETVAL = 0;
 	  if(ctrl && CVLD(name)) {
-		ret = ARDeleteSchema(ctrl, name, deleteOption, &status);
+		ret = ARDeleteSchema(ctrl, name,
+		        deleteOption,
+#if AR_CURRENT_API_VERSION >= 17
+			    objectModificationLogLabel,
+#endif
+		        &status);
 #ifdef PROFILE
 	        ((ars_ctrl *)ctrl)->queries++;
 #endif
@@ -2828,7 +3156,10 @@ ars_DeleteMultipleFields(ctrl, schema, deleteOption, ...)
 	     for(i = 0; i < c; i++) {
 		fieldList.internalIdList[i] = SvIV(ST(i + 3));
 	     }
-	     ret = ARDeleteMultipleFields(ctrl, schema, &fieldList, deleteOption, &status);
+	     ret = ARDeleteMultipleFields(ctrl, schema,
+		        &fieldList,
+		        deleteOption,
+		        &status);
 #ifdef PROFILE
 	     ((ars_ctrl *)ctrl)->queries++;
 #endif
@@ -2842,6 +3173,48 @@ ars_DeleteMultipleFields(ctrl, schema, deleteOption, ...)
 	}
 	OUTPUT:
 	RETVAL
+
+int
+ars_DeleteImage(ctrl, name, updateRef=FALSE)
+	ARControlStruct *       ctrl
+    char *                  name
+    ARBoolean               updateRef
+	CODE:
+	{
+	  char        *objectModificationLogLabel = NULL;
+	  ARStatusList status;
+#if AR_CURRENT_API_VERSION >= 14
+	  int          ret = 0;
+
+	  (void) ARError_reset();
+	  Zero(&status, 1,ARStatusList);
+	  RETVAL = 0;
+
+	  if(ctrl && name && *name) {
+		ret = ARDeleteImage(ctrl, name,
+		        updateRef,
+#if AR_CURRENT_API_VERSION >= 17
+			    objectModificationLogLabel,
+#endif
+		        &status);
+		if( !ARError( ret, status) ){
+			RETVAL = 1;
+		}
+	  }else{
+		(void) ARError_add( AR_RETURN_ERROR, AP_ERR_BAD_ARGS);
+	  }
+#else	/* prior to ARS 7.5 */
+	  (void) ARError_reset();
+	  Zero(&status, 1, ARStatusList);
+	  (void) ARError_add( AR_RETURN_ERROR, AP_ERR_DEPRECATED,
+	  "ars_DeleteImage() is only available in ARS >= 7.5");
+	  XSRETURN_UNDEF;
+#endif
+	}
+	OUTPUT:
+	RETVAL
+
+
 
 
 void
@@ -2923,6 +3296,8 @@ ars_GetEscalation(ctrl, name)
 	  Zero(&diaryList, 1, ARDiaryList);
 	  Zero(&elseList, 1,ARFilterActionList);
 	  Zero(&schemaList, 1, ARWorkflowConnectStruct);
+	  Zero(&objPropList, 1, ARPropList);
+
 	  ret = ARGetEscalation(ctrl, name, &escalationTm, &schemaList, &enable,
 			query, &actionList, &elseList, &helpText, &timestamp,
 			owner, lastChanged, &changeDiary, &objPropList, &status);
@@ -3070,6 +3445,10 @@ ars_GetFullTextInfo(ctrl)
 	OUTPUT:
 	RETVAL
 
+
+
+#ifdef GETLISTGROUP_OLD_STYLE
+
 HV *
 ars_GetListGroup(ctrl, userName=NULL,password=NULL)
 	ARControlStruct *	ctrl
@@ -3118,6 +3497,150 @@ ars_GetListGroup(ctrl, userName=NULL,password=NULL)
 	}
 	OUTPUT:
 	RETVAL
+
+#else
+
+void
+ars_GetListGroup(ctrl, userName=NULL,password=NULL)
+	ARControlStruct  *	ctrl
+	char *			       userName
+	char *			       password
+	PPCODE:
+	{
+	  ARStatusList    status;
+	  ARGroupInfoList groupList;
+	  int             ret = 0;
+
+	  (void) ARError_reset();
+	  Zero(&status, 1,ARStatusList);
+	  Zero(&groupList, 1, ARGroupInfoList);
+
+	  ret = ARGetListGroup(ctrl, userName, 
+#if AR_EXPORT_VERSION >= 6
+			       password,
+#endif
+			       &groupList, &status);
+#ifdef PROFILE
+	  ((ars_ctrl *)ctrl)->queries++;
+#endif
+      if(!ARError( ret, status)) {
+        unsigned int i;
+	    for(i = 0; i < groupList.numItems; i++) {
+          unsigned int v;
+        	 HV *groupInfo = newHV();
+          AV *gnameList = newAV();
+
+          for(v = 0; v < groupList.groupList[i].groupName.numItems ; v++) {
+             av_push(gnameList, newSVpv(groupList.groupList[i].groupName.nameList[v], 0));
+          }
+          hv_store(groupInfo, "groupId",   7, newSViv(groupList.groupList[i].groupId), 0);
+          hv_store(groupInfo, "groupType", 9, newSViv(groupList.groupList[i].groupType), 0);
+          hv_store(groupInfo, "groupName", 9, newRV_noinc((SV *)gnameList), 0);
+#if AR_CURRENT_API_VERSION >= 10
+          hv_store(groupInfo, "groupCategory", 13, newSViv(groupList.groupList[i].groupCategory), 0);
+#endif     
+
+          XPUSHs(sv_2mortal(newRV_noinc((SV *)groupInfo)));
+        }
+	  }
+
+      FreeARGroupInfoList(&groupList, FALSE);
+	}
+
+#endif
+
+
+void
+ars_GetListRole(ctrl, applicationName, userName=NULL,password=NULL)
+    ARControlStruct * ctrl
+    ARNameType        applicationName
+    char *            userName
+    char *            password
+    PPCODE:
+    {
+#if AR_EXPORT_VERSION >= 8L
+      ARStatusList    status;
+      ARRoleInfoList  roleList;
+      int             ret = 0;
+
+      (void) ARError_reset();
+      Zero(&status, 1,ARStatusList);
+      Zero(&roleList, 1, ARRoleInfoList);
+
+      ret = ARGetListRole(ctrl,
+                   applicationName, 
+                   userName, 
+                   password,
+                   &roleList, &status);
+
+      if(!ARError( ret, status)) {
+        unsigned int i;
+	    for(i = 0; i < roleList.numItems; i++) {
+          HV *roleInfo = newHV();
+
+          hv_store(roleInfo, "roleId",   6, newSViv(roleList.roleList[i].roleId), 0);
+          hv_store(roleInfo, "roleType", 8, newSViv(roleList.roleList[i].roleType), 0);
+          hv_store(roleInfo, "roleName", 8, newSVpv(roleList.roleList[i].roleName,0), 0);
+     
+          XPUSHs(sv_2mortal(newRV_noinc((SV *)roleInfo)));
+        }     
+      }
+      FreeARRoleInfoList(&roleList, FALSE);
+#else /* < 6.0 */
+      XPUSHs(sv_2mortal(newSViv(0))); /* ERR */
+      (void) ARError_add( AR_RETURN_ERROR, AP_ERR_DEPRECATED, 
+            "ars_GetListRole() is only available in ARS >= 6.0");
+#endif
+    }
+
+
+void
+ars_GetListLicense(ctrl, licenseType=NULL)
+    ARControlStruct *  ctrl
+    char *             licenseType
+    PPCODE:
+    {
+#if AR_EXPORT_VERSION >= 6L
+      ARStatusList       status;
+      ARLicenseInfoList  licList;
+      int                ret = 0;
+
+      (void) ARError_reset();
+      Zero(&status, 1,ARStatusList);
+      Zero(&licList, 1, ARLicenseInfoList);
+
+      ret = ARGetListLicense(ctrl,
+                   licenseType, 
+                   &licList, &status);
+
+      if(!ARError( ret, status)) {
+        unsigned int i;
+	    for(i = 0; i < licList.numItems; i++) {
+          HV *licInfo = newHV();
+
+          hv_store(licInfo, "licKey",  6, newSVpv(licList.licenseInfoList[i].licKey,0), 0);
+          hv_store(licInfo, "licType", 8, newSVpv(licList.licenseInfoList[i].licType,0), 0);
+          hv_store(licInfo, "licSubtype", 10, newSVpv(licList.licenseInfoList[i].licSubtype,0), 0);
+          hv_store(licInfo, "issuedDate", 10, 
+            perl_ARLicenseDateStruct(ctrl, &(licList.licenseInfoList[i].issuedDate)), 0);
+          hv_store(licInfo, "expireDate", 10,
+            perl_ARLicenseDateStruct(ctrl, &(licList.licenseInfoList[i].expireDate)), 0);
+          hv_store(licInfo, "hostId", 6, newSVpv(licList.licenseInfoList[i].hostId,0), 0);
+          hv_store(licInfo, "numLicenses", 11, newSViv(licList.licenseInfoList[i].numLicenses), 0);
+          hv_store(licInfo, "tokenList", 9, newSVpv(licList.licenseInfoList[i].tokenList,0), 0);
+          hv_store(licInfo, "comment", 7, newSVpv(licList.licenseInfoList[i].comment,0), 0);
+     
+          XPUSHs(sv_2mortal(newRV_noinc((SV *)licInfo)));
+        }     
+      }
+      FreeARLicenseInfoList(&licList, FALSE);
+#else /* < 6.0 */
+      XPUSHs(sv_2mortal(newSViv(0))); /* ERR */
+      (void) ARError_add( AR_RETURN_ERROR, AP_ERR_DEPRECATED, 
+            "ars_GetListLicense() is only available in ARS >= 5.0");
+#endif
+    }
+
 
 HV *
 ars_GetListSQL(ctrl, sqlCommand, maxRetrieve=AR_NO_MAX_LIST_RETRIEVE)
@@ -3242,7 +3765,13 @@ ars_GetListVUI(ctrl, schema, changedSince=0)
 	  Zero(&status, 1,ARStatusList);
 	  Zero(&idList, 1, ARInternalIdList);
 
-	  ret = ARGetListVUI(ctrl, schema, changedSince, &idList, &status);
+	  ret = ARGetListVUI(ctrl, schema, 
+				changedSince,
+#if AR_CURRENT_API_VERSION >= 17
+				NULL,     /* &objPropList (undocumented by BMC) */
+#endif
+				&idList,
+				&status);
 #ifdef PROFILE
 	  ((ars_ctrl *)ctrl)->queries++;
 #endif
@@ -3275,31 +3804,29 @@ ars_SetServerInfo(ctrl, ...)
 			(void) ARError_add(AR_RETURN_ERROR, 
 					   AP_ERR_BAD_ARGS);
 		} else {
-			unsigned int infoType;
-			char         buf[64];
+			unsigned int infoType, j = 0;
+			char         buf[256];
 
 			serverInfo.numItems = (items - 1) / 2;
 			serverInfo.serverInfoList = MALLOCNN(serverInfo.numItems * sizeof(ARServerInfoStruct));
-			Zero(serverInfo.serverInfoList, 1, ARServerInfoStruct);
+			/* Zero(serverInfo.serverInfoList, 1, ARServerInfoStruct); # happens already in MALLOCNN */
 
-			for(i = 1 ; i < items ; i += 2) {
-				/*printf("[%d] ", i);
-				printf("k=%d v=%s\n",
-					SvIV(ST(i)),
-					SvPV(ST(i+1), PL_na)
-				);*/
+			for(j = 0 ; j < serverInfo.numItems ; ++j) {
+				i = 2 * j + 1;
+
 				infoType = lookUpServerInfoTypeHint(SvIV(ST(i)));
-				serverInfo.serverInfoList[i-1].operation = SvIV(ST(i));
-				serverInfo.serverInfoList[i-1].value.dataType = infoType;
+				serverInfo.serverInfoList[j].operation = SvIV(ST(i));
+				serverInfo.serverInfoList[j].value.dataType = infoType;
 
 				switch(infoType) {
 				case AR_DATA_TYPE_CHAR:
-					serverInfo.serverInfoList[i-1].value.u.charVal = strdup(SvPV(ST(i+1), PL_na));
+					serverInfo.serverInfoList[j].value.u.charVal = strdup(SvPV(ST(i+1), PL_na));
 					break;
 				case AR_DATA_TYPE_INTEGER:
-					serverInfo.serverInfoList[i-1].value.u.intVal = SvIV(ST(i+1));
+					serverInfo.serverInfoList[j].value.u.intVal = SvIV(ST(i+1));
 					break;
 				default:
+					sprintf( buf, "(%d) type = %d", serverInfo.serverInfoList[j].operation, serverInfo.serverInfoList[j].value.dataType );
 					(void) ARError_add(AR_RETURN_ERROR, AP_ERR_INV_ARGS, 
 						buf);
 					FreeARServerInfoList(&serverInfo, FALSE);
@@ -3340,19 +3867,27 @@ ars_GetServerInfo(ctrl, ...)
 	     for(i = 0; i < AR_MAX_SERVER_INFO_USED ; i++) {
 	        /* we'll exclude ones that can't be retrieved to avoid errors */
 	        switch(i+1) {
-	        case AR_SERVER_INFO_DB_PASSWORD:
-		   break;
+	           case AR_SERVER_INFO_DB_PASSWORD:
+#if AR_CURRENT_API_VERSION < 17
+	           case 332:
+	           case 331:
+	           case 330:
+	           case 329:
+	           case 328:
+	           case 327:
+	           case 326:
+	           case 325:
+#endif
+	           break;
 	        default:
 	           rlist[count++] = i+1;
 	        }
-             }
-	  } 
-	  else if(items > AR_MAX_SERVER_INFO_USED + 1) {
+         }
+	  }else if(items > AR_MAX_SERVER_INFO_USED + 1) {
 	    ARError_add( AR_RETURN_ERROR, AP_ERR_BAD_ARGS);
-	  }
-	  else { /* user has asked for specific ones */
+	  }else { /* user has asked for specific ones */
 	     for(i = 1 ; i < items ; i++) {
-		rlist[count++] = SvIV(ST(i));
+	        rlist[count++] = SvIV(ST(i));
 	     }
 	  }
 	  if(count > 0) {
@@ -3368,6 +3903,7 @@ ars_GetServerInfo(ctrl, ...)
 		 * push out it's translation. else push out the code itself
 		 */
 		   if(serverInfo.serverInfoList[ui].operation <= AR_MAX_SERVER_INFO_USED) {
+		      /* printf( "%d %s: data type = %d\n", serverInfo.serverInfoList[ui].operation, ServerInfoMap[serverInfo.serverInfoList[ui].operation].name, serverInfo.serverInfoList[ui].value.dataType ); */
 	  	      XPUSHs(sv_2mortal(newSVpv(ServerInfoMap[serverInfo.serverInfoList[ui].operation].name, 0)));
 		   } else {
 		      XPUSHs(sv_2mortal(newSViv(serverInfo.serverInfoList[ui].operation)));
@@ -3397,7 +3933,8 @@ ars_GetVUI(ctrl, schema, vuiId)
 	  ARAccessNameType   lastChanged;
 	  char        *changeDiary = CPNULL;
 	  int          ret = 0;
-	  ARDiaryList      diaryList;
+	  ARDiaryList  diaryList;
+	  ARPropList   objPropList;
 # if AR_EXPORT_VERSION >= 6
 	  unsigned int vuiType = 0;
 	  ARLocaleType locale;
@@ -3409,6 +3946,7 @@ ars_GetVUI(ctrl, schema, vuiId)
 	  Zero(&status, 1,ARStatusList);
 	  Zero(vuiName, 1, ARNameType);
 	  Zero(&dPropList, 1, ARPropList);
+	  Zero(&objPropList, 1, ARPropList);
 	  Zero(&timestamp, 1, ARTimestamp);
 	  Zero(owner, 1, ARAccessNameType);
 	  Zero(lastChanged, 1, ARAccessNameType);
@@ -3417,7 +3955,11 @@ ars_GetVUI(ctrl, schema, vuiId)
 			 locale, &vuiType,
 # endif
 			 &dPropList, &helpText, 
-			 &timestamp, owner, lastChanged, &changeDiary, &status);
+			 &timestamp, owner, lastChanged, &changeDiary,
+#if AR_CURRENT_API_VERSION >= 17
+			 &objPropList,
+#endif
+			 &status);
 # ifdef PROFILE
 	  ((ars_ctrl *)ctrl)->queries++;
 # endif
@@ -3450,12 +3992,18 @@ ars_GetVUI(ctrl, schema, vuiId)
 	     }
 	     hv_store(RETVAL,  "timestamp", strlen("timestamp") , newSViv(timestamp), 0);
 	     hv_store(RETVAL,  "props", strlen("props") ,
-		perl_ARList( ctrl,
+		 perl_ARList( ctrl,
 			    (ARList *)&dPropList,
+			    (ARS_fn)perl_ARPropStruct,
+			    sizeof(ARPropStruct)), 0);
+	     hv_store(RETVAL,  "objPropList", strlen("objPropList") ,
+		 perl_ARList( ctrl,
+			    (ARList *)&objPropList,
 			    (ARS_fn)perl_ARPropStruct,
 			    sizeof(ARPropStruct)), 0);
 	  }
 	  FreeARPropList(&dPropList, FALSE);
+	  FreeARPropList(&objPropList, FALSE);
 	  if(helpText) {
 	    	AP_FREE(helpText);
 	  }
@@ -3493,6 +4041,7 @@ ars_CreateCharMenu( ctrl, menuDefRef, removeFlag=TRUE )
 		ARAccessNameType owner;
 		char *changeDiary = NULL;
 		ARPropList objPropList;
+	    char *objectModificationLogLabel = NULL;
 		ARStatusList status;
 		HV *menuDef = NULL;
 		SV **pSvTemp;
@@ -3521,7 +4070,7 @@ ars_CreateCharMenu( ctrl, menuDefRef, removeFlag=TRUE )
 			ARError_add(AR_RETURN_WARNING, AP_ERR_CONTINUE,
 					refreshCodeStr ? refreshCodeStr : "[key null]" );
 		}
-		if( refreshCodeStr != NULL ){  free(refreshCodeStr);  }
+		if( refreshCodeStr != NULL ){  AP_FREE(refreshCodeStr);  }
 
 		rv += strmakHVal( menuDef, "menuType", &menuTypeStr );
 		arMenuDef.menuType = revTypeName( (TypeMapStruct*)CharMenuTypeMap, menuTypeStr );
@@ -3531,7 +4080,7 @@ ars_CreateCharMenu( ctrl, menuDefRef, removeFlag=TRUE )
 			ARError_add(AR_RETURN_WARNING, AP_ERR_CONTINUE,
 					menuTypeStr ? menuTypeStr : "[key null]" );
 		}
-		if( menuTypeStr != NULL ){  free(menuTypeStr);  }
+		if( menuTypeStr != NULL ){  AP_FREE(menuTypeStr);  }
 
 		switch( arMenuDef.menuType ){
 		case AR_CHAR_MENU_LIST:
@@ -3598,6 +4147,9 @@ ars_CreateCharMenu( ctrl, menuDefRef, removeFlag=TRUE )
 				owner,
 				changeDiary,
 				&objPropList,
+#if AR_CURRENT_API_VERSION >= 17
+			    objectModificationLogLabel,
+#endif
 				&status );
 
 			RETVAL = ARError(ret,status) ? 0 : 1;
@@ -3607,10 +4159,10 @@ ars_CreateCharMenu( ctrl, menuDefRef, removeFlag=TRUE )
 		}
 
 	    if( helpText != NULL ){
-			free( helpText );
+			AP_FREE( helpText );
 		}
 	    if( changeDiary != NULL ){
-			free( changeDiary );
+			AP_FREE( changeDiary );
 		}
 		FreeARCharMenuStruct( &arMenuDef, FALSE );
 		FreeARPropList( &objPropList, FALSE );
@@ -3649,6 +4201,7 @@ ars_SetCharMenu( ctrl, name, menuDefRef, removeFlag=TRUE )
 		ARAccessNameType owner;
 		char *changeDiary = NULL;
 		ARPropList *objPropList = NULL;
+		char *objectModificationLogLabel = NULL;
 		ARStatusList status;
 		HV *menuDef = NULL;
 		SV **pSvTemp;
@@ -3680,7 +4233,7 @@ ars_SetCharMenu( ctrl, name, menuDefRef, removeFlag=TRUE )
 				ARError_add(AR_RETURN_WARNING, AP_ERR_CONTINUE,
 						refreshCodeStr ? refreshCodeStr : "[key null]" );
 			}
-			if( refreshCodeStr != NULL ){  free(refreshCodeStr);  }
+			if( refreshCodeStr != NULL ){  AP_FREE(refreshCodeStr);  }
 
 			refreshCodePtr = &refreshCode;
 		}
@@ -3697,7 +4250,7 @@ ars_SetCharMenu( ctrl, name, menuDefRef, removeFlag=TRUE )
 				ARError_add(AR_RETURN_WARNING, AP_ERR_CONTINUE,
 						menuTypeStr ? menuTypeStr : "[key null]" );
 			}
-			if( menuTypeStr != NULL ){  free(menuTypeStr);  }
+			if( menuTypeStr != NULL ){  AP_FREE(menuTypeStr);  }
 
 			switch( arMenuDef->menuType ){
 			case AR_CHAR_MENU_LIST:
@@ -3765,6 +4318,9 @@ ars_SetCharMenu( ctrl, name, menuDefRef, removeFlag=TRUE )
 				owner,
 				changeDiary,
 				objPropList,
+#if AR_CURRENT_API_VERSION >= 17
+			    objectModificationLogLabel,
+#endif
 				&status );
 
 			RETVAL = ARError(ret,status) ? 0 : 1;
@@ -3774,10 +4330,10 @@ ars_SetCharMenu( ctrl, name, menuDefRef, removeFlag=TRUE )
 		}
 
 	    if( helpText != NULL ){
-			free( helpText );
+			AP_FREE( helpText );
 		}
 	    if( changeDiary != NULL ){
-			free( changeDiary );
+			AP_FREE( changeDiary );
 		}
 		if( arMenuDef != NULL ){
 			FreeARCharMenuStruct( arMenuDef, TRUE );
@@ -3814,7 +4370,7 @@ ars_CreateField( ctrl, schema, fieldDefRef, reservedIdOK=0 )
 		ARFieldMappingStruct fieldMap;
 		unsigned int dataType;
 		unsigned int option;
-		unsigned int createMode;
+		unsigned int createMode = AR_FIELD_PROTECTED_AT_CREATE;
 #if AR_EXPORT_VERSION >= 9L
 		unsigned int fieldOption;
 #endif
@@ -3825,6 +4381,7 @@ ars_CreateField( ctrl, schema, fieldDefRef, reservedIdOK=0 )
 		char *helpText = NULL;
 		ARAccessNameType owner;
 		char *changeDiary = NULL;
+		ARPropList *objPropList = NULL;
 		ARStatusList status;
 		HV *fieldDef = NULL;
 		SV **pSvTemp;
@@ -3886,7 +4443,14 @@ ars_CreateField( ctrl, schema, fieldDefRef, reservedIdOK=0 )
 			/* rv += rev_ARFieldLimitStruct( ctrl, fieldDef, "limit", "dataType", limit ); */
 			rv += rev_ARFieldLimitStruct( ctrl, fieldDef, "limit", limit );
 		}
-
+#if AR_CURRENT_API_VERSION >= 17
+		pSvTemp = hv_fetch( fieldDef, "objPropList", strlen("objPropList") , 0 );
+		if( pSvTemp && *pSvTemp && SvTYPE(*pSvTemp) != SVt_NULL ){
+			objPropList = (ARPropList*) MALLOCNN( sizeof(ARPropList) );
+			/* rv += rev_ARPropList( ctrl, fieldDef, "objPropList", "dataType", objPropList ); */
+			rv += rev_ARPropList( ctrl, fieldDef, "objPropList", objPropList );
+		}
+#endif
 		rv += rev_ARDisplayInstanceList( ctrl, fieldDef, "displayInstanceList", &dInstanceList );
 
 		if( hv_exists(fieldDef,"helpText",8) ){
@@ -3920,6 +4484,9 @@ ars_CreateField( ctrl, schema, fieldDefRef, reservedIdOK=0 )
 				helpText,
 				owner,
 				changeDiary,
+#if AR_CURRENT_API_VERSION >= 17
+				objPropList,
+#endif
 				&status );
 
 			RETVAL = ARError(ret,status) ? 0 : fieldId;
@@ -3929,10 +4496,10 @@ ars_CreateField( ctrl, schema, fieldDefRef, reservedIdOK=0 )
 		}
 
 	    if( helpText != NULL ){
-			free( helpText );
+			AP_FREE( helpText );
 		}
 	    if( changeDiary != NULL ){
-			free( changeDiary );
+			AP_FREE( changeDiary );
 		}
 		if( defaultVal != NULL ){
 			FreeARValueStruct( defaultVal, TRUE );
@@ -3988,6 +4555,7 @@ ars_SetField( ctrl, schema, fieldId, fieldDefRef )
 		unsigned int	setFieldOptions = 0;
 #endif
 		char *changeDiary = NULL;
+		ARPropList *objPropList = NULL;
 		ARStatusList status;
 		HV *fieldDef = NULL;
 		SV **pSvTemp;
@@ -4065,7 +4633,14 @@ ars_SetField( ctrl, schema, fieldId, fieldDefRef )
 			/* rv += rev_ARFieldLimitStruct( ctrl, fieldDef, "limit", "dataType", limit ); */
 			rv += rev_ARFieldLimitStruct( ctrl, fieldDef, "limit", limit );
 		}
-
+#if AR_CURRENT_API_VERSION >= 17
+		pSvTemp = hv_fetch( fieldDef, "objPropList", strlen("objPropList") , 0 );
+		if( pSvTemp && *pSvTemp && SvTYPE(*pSvTemp) != SVt_NULL ){
+			objPropList = (ARPropList*) MALLOCNN( sizeof(ARPropList) );
+			/* rv += rev_ARPropList( ctrl, fieldDef, "objPropList", "dataType", objPropList ); */
+			rv += rev_ARPropList( ctrl, fieldDef, "objPropList", objPropList );
+		}
+#endif
 		pSvTemp = hv_fetch( fieldDef, "displayInstanceList", strlen("displayInstanceList") , 0 );
 		if( pSvTemp && *pSvTemp && SvTYPE(*pSvTemp) != SVt_NULL ){
 			dInstanceList = (ARDisplayInstanceList*) MALLOCNN( sizeof(ARDisplayInstanceList) );
@@ -4110,6 +4685,9 @@ ars_SetField( ctrl, schema, fieldId, fieldDefRef )
 #if AR_EXPORT_VERSION >= 9L
 				setFieldOptions,
 #endif
+#if AR_CURRENT_API_VERSION >= 17
+				objPropList,
+#endif
 				&status );
 
 			RETVAL = ARError(ret,status) ? 0 : fieldId;
@@ -4119,16 +4697,16 @@ ars_SetField( ctrl, schema, fieldId, fieldDefRef )
 		}
 		
 	    if( createMode != NULL ){
-			free( createMode );
+			AP_FREE( createMode );
 		}
 	    if( option != NULL ){
-			free( option );
+			AP_FREE( option );
 		}
 	    if( helpText != NULL ){
-			free( helpText );
+			AP_FREE( helpText );
 		}
 	    if( changeDiary != NULL ){
-			free( changeDiary );
+			AP_FREE( changeDiary );
 		}
 		if( defaultVal != NULL ){
 			FreeARValueStruct( defaultVal, TRUE );
@@ -4185,6 +4763,7 @@ ars_CreateSchema( ctrl, schemaDefRef )
 		ARAccessNameType owner;
 		char *changeDiary = NULL;
 		ARPropList *objPropList = NULL;
+		char *objectModificationLogLabel = NULL;
 		ARStatusList status;
 		HV *schemaDef = NULL;
 		SV **pSvTemp;
@@ -4306,6 +4885,9 @@ ars_CreateSchema( ctrl, schemaDefRef )
 				owner,
 				changeDiary,
 				objPropList,
+#if AR_CURRENT_API_VERSION >= 17
+			    objectModificationLogLabel,
+#endif
 				&status );
 
 			RETVAL = ARError(ret,status) ? 0 : 1;
@@ -4315,10 +4897,10 @@ ars_CreateSchema( ctrl, schemaDefRef )
 		}
 
 	    if( helpText != NULL ){
-			free( helpText );
+			AP_FREE( helpText );
 		}
 	    if( changeDiary != NULL ){
-			free( changeDiary );
+			AP_FREE( changeDiary );
 		}
 		FreeARCompoundSchema( &compoundSchema, FALSE );
 		FreeARPermissionList( &groupList, FALSE );
@@ -4378,6 +4960,7 @@ ars_SetSchema( ctrl, name, schemaDefRef )
 		char *ownerPtr = NULL; 
 		char *changeDiary = NULL;
 		ARPropList *objPropList = NULL;
+		char *objectModificationLogLabel = NULL;
 		ARStatusList status;
 		HV *schemaDef = NULL;
 		SV **pSvTemp;
@@ -4501,6 +5084,9 @@ ars_SetSchema( ctrl, name, schemaDefRef )
 #if AR_EXPORT_VERSION >= 8L
 				0,              /* setOption, reserved for future use */
 #endif
+#if AR_CURRENT_API_VERSION >= 17
+			    objectModificationLogLabel,
+#endif
 				&status );
 
 			RETVAL = ARError(ret,status) ? 0 : 1;
@@ -4510,10 +5096,10 @@ ars_SetSchema( ctrl, name, schemaDefRef )
 		}
 
 	    if( helpText != NULL ){
-			free( helpText );
+			AP_FREE( helpText );
 		}
 	    if( changeDiary != NULL ){
-			free( changeDiary );
+			AP_FREE( changeDiary );
 		}
 		if( compoundSchema != NULL ){
 			FreeARCompoundSchema( compoundSchema, TRUE );
@@ -4571,6 +5157,7 @@ ars_CreateVUI( ctrl, schemaName, vuiDefRef )
 		char *helpText = NULL;
 		ARAccessNameType owner;
 		char *changeDiary = NULL;
+		ARPropList objPropList;
 		ARStatusList status;
 		HV *vuiDef = NULL;
 		SV **pSvTemp;
@@ -4580,6 +5167,7 @@ ars_CreateVUI( ctrl, schemaName, vuiDefRef )
 		Zero(vuiName, 1,ARNameType);
 		Zero(locale, 1,ARLocaleType);
 		Zero(&dPropList, 1,ARPropList);
+		Zero(&objPropList, 1,ARPropList);
 		Zero(owner, 1,ARAccessNameType);
 		Zero(&status, 1,ARStatusList);
 
@@ -4606,8 +5194,15 @@ ars_CreateVUI( ctrl, schemaName, vuiDefRef )
 			/* dPropList.props = (ARPropStruct*) MALLOCNN( sizeof(ARPropStruct) ); */
 			rv += rev_ARPropList( ctrl, vuiDef, "props", &dPropList );
 		}
-
-
+#if AR_CURRENT_API_VERSION >= 17
+		objPropList.numItems = 0;
+		objPropList.props = NULL;
+		pSvTemp = hv_fetch( vuiDef, "objPropList", strlen("objPropList") , 0 );
+		if( pSvTemp && *pSvTemp && SvTYPE(*pSvTemp) != SVt_NULL ){
+			/* objPropList.props = (ARPropStruct*) MALLOCNN( sizeof(ARPropStruct) ); */
+			rv += rev_ARPropList( ctrl, vuiDef, "objPropList", &objPropList );
+		}
+#endif
 		if( hv_exists(vuiDef,"helpText",8) ){
 			rv += strmakHVal( vuiDef, "helpText", &helpText ); 
 		}
@@ -4629,6 +5224,9 @@ ars_CreateVUI( ctrl, schemaName, vuiDefRef )
 				helpText,
 				owner,
 				changeDiary,
+#if AR_CURRENT_API_VERSION >= 17
+				&objPropList,
+#endif
 				&status );
 
 			RETVAL = ARError(ret,status) ? 0 : 1;
@@ -4638,12 +5236,13 @@ ars_CreateVUI( ctrl, schemaName, vuiDefRef )
 		}
 
 	    if( helpText != NULL ){
-			free( helpText );
+			AP_FREE( helpText );
 		}
 	    if( changeDiary != NULL ){
-			free( changeDiary );
+			AP_FREE( changeDiary );
 		}
 		FreeARPropList( &dPropList, FALSE );
+		FreeARPropList( &objPropList, FALSE );
 #else /* < 5.0 */
 	  XPUSHs(sv_2mortal(newSViv(0))); /* ERR */
 	  (void) ARError_add( AR_RETURN_ERROR, AP_ERR_DEPRECATED, 
@@ -4678,6 +5277,7 @@ ars_SetVUI( ctrl, schemaName, vuiId, vuiDefRef )
 		ARAccessNameType owner;
 		char *ownerPtr = NULL;
 		char *changeDiary = NULL;
+		ARPropList *objPropList = NULL;
 		ARStatusList status;
 		HV *vuiDef = NULL;
 		SV **pSvTemp;
@@ -4686,7 +5286,6 @@ ars_SetVUI( ctrl, schemaName, vuiId, vuiDefRef )
 		(void) ARError_reset();
 		Zero(vuiName, 1,ARNameType);
 		Zero(locale, 1,ARLocaleType);
-		Zero(&dPropList, 1,ARPropList);
 		Zero(owner, 1,ARAccessNameType);
 		Zero(&status, 1,ARStatusList);
 
@@ -4725,8 +5324,13 @@ ars_SetVUI( ctrl, schemaName, vuiId, vuiDefRef )
 			dPropList = (ARPropList*) MALLOCNN( sizeof(ARPropList) );
 			rv += rev_ARPropList( ctrl, vuiDef, "props", dPropList );
 		}
-
-		
+#if AR_CURRENT_API_VERSION >= 17
+		pSvTemp = hv_fetch( vuiDef, "objPropList", strlen("objPropList") , 0 );
+		if( pSvTemp && *pSvTemp && SvTYPE(*pSvTemp) != SVt_NULL ){
+			objPropList = (ARPropList*) MALLOCNN( sizeof(ARPropList) );
+			rv += rev_ARPropList( ctrl, vuiDef, "objPropList", objPropList );
+		}
+#endif
 		if( hv_exists(vuiDef,"helpText",8) ){
 			rv += strmakHVal( vuiDef, "helpText", &helpText ); 
 		}
@@ -4750,6 +5354,9 @@ ars_SetVUI( ctrl, schemaName, vuiId, vuiDefRef )
 				helpText,
 				owner,
 				changeDiary,
+#if AR_CURRENT_API_VERSION >= 17
+				objPropList,
+#endif
 				&status );
 
 			RETVAL = ARError(ret,status) ? 0 : 1;
@@ -4759,12 +5366,13 @@ ars_SetVUI( ctrl, schemaName, vuiId, vuiDefRef )
 		}
 
 	    if( helpText != NULL ){
-			free( helpText );
+			AP_FREE( helpText );
 		}
 	    if( changeDiary != NULL ){
-			free( changeDiary );
+			AP_FREE( changeDiary );
 		}
 		FreeARPropList( dPropList, TRUE );
+		FreeARPropList( objPropList, TRUE );
 #else /* < 5.0 */
 	  XPUSHs(sv_2mortal(newSViv(0))); /* ERR */
 	  (void) ARError_add( AR_RETURN_ERROR, AP_ERR_DEPRECATED, 
@@ -4801,6 +5409,7 @@ ars_CreateContainer( ctrl, containerDefRef, removeFlag=TRUE )
 		ARAccessNameType owner;
 		char *changeDiary = NULL;
 		ARPropList objPropList;
+		char *objectModificationLogLabel = NULL;
 		ARStatusList status;
 		HV *containerDef = NULL;
 		SV **pSvTemp;
@@ -4834,7 +5443,7 @@ ars_CreateContainer( ctrl, containerDefRef, removeFlag=TRUE )
 			ARError_add(AR_RETURN_WARNING, AP_ERR_CONTINUE,
 					typeStr ? typeStr : "[key null]" );
 		}
-		if( typeStr != NULL ){  free(typeStr);  }
+		if( typeStr != NULL ){  AP_FREE(typeStr);  }
 
 		groupList.numItems = 0;
 		groupList.permissionList = NULL;
@@ -4902,6 +5511,9 @@ ars_CreateContainer( ctrl, containerDefRef, removeFlag=TRUE )
 				owner,
 				changeDiary,
 				&objPropList,
+#if AR_CURRENT_API_VERSION >= 17
+			    objectModificationLogLabel,
+#endif
 				&status );
 
 			RETVAL = ARError(ret,status) ? 0 : 1;
@@ -4911,16 +5523,16 @@ ars_CreateContainer( ctrl, containerDefRef, removeFlag=TRUE )
 		}
 
 	    if( label != NULL ){
-			free( label );
+			AP_FREE( label );
 		}
 	    if( description != NULL ){
-			free( description );
+			AP_FREE( description );
 		}
 	    if( helpText != NULL ){
-			free( helpText );
+			AP_FREE( helpText );
 		}
 	    if( changeDiary != NULL ){
-			free( changeDiary );
+			AP_FREE( changeDiary );
 		}
 		FreeARPermissionList( &groupList, FALSE );
 		FreeARInternalIdList( &admingrpList, FALSE );
@@ -4966,6 +5578,7 @@ ars_SetContainer( ctrl, name, containerDefRef, removeFlag=TRUE )
 		ARAccessNameType owner;
 		char *changeDiary = NULL;
 		ARPropList *objPropList = NULL;
+		char *objectModificationLogLabel = NULL;
 		ARStatusList status;
 		HV *containerDef = NULL;
 		SV **pSvTemp;
@@ -4999,7 +5612,7 @@ ars_SetContainer( ctrl, name, containerDefRef, removeFlag=TRUE )
 				ARError_add(AR_RETURN_WARNING, AP_ERR_CONTINUE,
 						typeStr ? typeStr : "[key null]" );
 			}
-			if( typeStr != NULL ){  free(typeStr);  }
+			if( typeStr != NULL ){  AP_FREE(typeStr);  }
 
 			typePtr = &type;
 		}
@@ -5066,6 +5679,9 @@ ars_SetContainer( ctrl, name, containerDefRef, removeFlag=TRUE )
 				owner,
 				changeDiary,
 				objPropList,
+#if AR_CURRENT_API_VERSION >= 17
+			    objectModificationLogLabel,
+#endif
 				&status );
 
 			RETVAL = ARError(ret,status) ? 0 : 1;
@@ -5075,16 +5691,16 @@ ars_SetContainer( ctrl, name, containerDefRef, removeFlag=TRUE )
 		}
 
 	    if( label != NULL ){
-			free( label );
+			AP_FREE( label );
 		}
 	    if( description != NULL ){
-			free( description );
+			AP_FREE( description );
 		}
 	    if( helpText != NULL ){
-			free( helpText );
+			AP_FREE( helpText );
 		}
 	    if( changeDiary != NULL ){
-			free( changeDiary );
+			AP_FREE( changeDiary );
 		}
 		if( groupList != NULL ){
 			FreeARPermissionList( groupList, TRUE );
@@ -5139,6 +5755,7 @@ ars_CreateActiveLink(ctrl, alDefRef)
 	  char                  *helpText = CPNULL;
 	  ARAccessNameType       owner;
 	  char                  *changeDiary = CPNULL;
+	  char                  *objectModificationLogLabel = NULL;
 	  ARStatusList           status;
 #if AR_EXPORT_VERSION >= 5
 	  ARNameList              schemaNameList;
@@ -5217,11 +5834,6 @@ ars_CreateActiveLink(ctrl, alDefRef)
 
 		rv += rev_ARActiveLinkActionList(ctrl, alDef, "actionList", 
 						&actionList);
-#if AR_EXPORT_VERSION >= 5
-		if(hv_exists(alDef,  "objPropList", strlen("objPropList") ))
-			rv += rev_ARPropList(ctrl, alDef, "objPropList",
-					     &objPropList);
-#endif
 #if AR_EXPORT_VERSION >= 3
 		rv += rev_ARActiveLinkActionList(ctrl, alDef, "elseList", 
 						&elseList);
@@ -5245,6 +5857,11 @@ ars_CreateActiveLink(ctrl, alDefRef)
 			rv += rev_ARDisplayList(ctrl,  alDef, "displayList", 
 					&displayList);
 #endif
+#if AR_EXPORT_VERSION >= 5
+		if(hv_exists(alDef,  "objPropList", strlen("objPropList") ))
+			rv += rev_ARPropList(ctrl, alDef, "objPropList",
+					     &objPropList);
+#endif
 		/* at this point all datastructures (hopefully) are 
 		 * built. we can call the api routine to create the
 		 * active link.
@@ -5257,14 +5874,23 @@ ars_CreateActiveLink(ctrl, alDefRef)
 					    enable, query,
 					    &actionList, &elseList, 
 					    helpText, owner, changeDiary, 
-					    &objPropList, &status);
+					    &objPropList,
+#if AR_CURRENT_API_VERSION >= 14
+						0,            /* errorActlinkOptions, reserved for future use */
+						NULL,         /* errorActlinkName,    reserved for future use */
+#endif
+#if AR_CURRENT_API_VERSION >= 17
+					    objectModificationLogLabel,
+#endif
+					    &status);
 #elif AR_EXPORT_VERSION >= 3
 		   ret = ARCreateActiveLink(ctrl, name, order, schema, 
 					    &groupList, executeMask,
 					    &controlField, &focusField, 
 					    enable, query,
 					    &actionList, &elseList, 
-					    helpText, owner, changeDiary, &status);
+					    helpText, owner, changeDiary,
+					    &status);
 #else /* 2.x */
 #endif
 		   if(!ARError( ret, status))
@@ -5318,6 +5944,7 @@ ars_SetActiveLink(ctrl, name, objDefRef)
 	  ARAccessNameType         owner;
 	  char                    *ownerPtr = NULL;
 	  char                    *changeDiary = CPNULL;
+	  char                    *objectModificationLogLabel = NULL;
 	  ARStatusList             status;
 	  ARWorkflowConnectStruct  *schemaList = NULL;
 	  ARPropList               *objPropList = NULL;
@@ -5396,14 +6023,14 @@ ars_SetActiveLink(ctrl, name, objDefRef)
 			rv += rev_ARActiveLinkActionList(ctrl, objDef, "actionList", actionList);
 		}
 
+		if(hv_exists(objDef,  "elseList", strlen("elseList") )){
+			elseList = (ARActiveLinkActionList*) MALLOCNN(sizeof(ARActiveLinkActionList));
+			rv += rev_ARActiveLinkActionList(ctrl, objDef, "elseList", elseList);
+		}
+
 		if(hv_exists(objDef,  "objPropList", strlen("objPropList") )){
 			objPropList = (ARPropList*) MALLOCNN(sizeof(ARPropList));
 			rv += rev_ARPropList(ctrl, objDef, "objPropList", objPropList);
-		}
-
-		if(hv_exists(objDef,  "actionList", strlen("actionList") )){
-			elseList = (ARActiveLinkActionList*) MALLOCNN(sizeof(ARActiveLinkActionList));
-			rv += rev_ARActiveLinkActionList(ctrl, objDef, "elseList", elseList);
 		}
 
 		if( executeMask != NULL ){
@@ -5428,7 +6055,15 @@ ars_SetActiveLink(ctrl, name, objDefRef)
 					    enable, query,
 					    actionList, elseList, 
 					    helpText, ownerPtr, changeDiary, 
-					    objPropList, &status);
+					    objPropList,
+#if AR_CURRENT_API_VERSION >= 14
+						NULL,         /* errorActlinkOptions, reserved for future use */
+						NULL,         /* errorActlinkName,    reserved for future use */
+#endif
+#if AR_CURRENT_API_VERSION >= 17
+					    objectModificationLogLabel,
+#endif
+					    &status);
 		   if(!ARError( ret, status))
 			   RETVAL = 1;
 		} else 
@@ -5481,6 +6116,7 @@ ars_CreateFilter(ctrl, objDefRef)
 	  char                  *helpText = CPNULL;
 	  ARAccessNameType       owner;
 	  char                  *changeDiary = CPNULL;
+	  char                  *objectModificationLogLabel = NULL;
 	  ARStatusList           status;
 	  ARNameList              schemaNameList;
 	  ARWorkflowConnectStruct schemaList;
@@ -5570,7 +6206,7 @@ ars_CreateFilter(ctrl, objDefRef)
 
 		/* at this point all datastructures (hopefully) are 
 		 * built. we can call the api routine to create the
-		 * active link.
+		 * filter.
 		 */
 		if(rv == 0) {
 		   ret = ARCreateFilter(ctrl, name, order, &schemaList, 
@@ -5582,6 +6218,9 @@ ars_CreateFilter(ctrl, objDefRef)
 #if AR_CURRENT_API_VERSION >= 13
 					    errorFilterOptions,
 					    errorFilterName,
+#endif
+#if AR_CURRENT_API_VERSION >= 17
+					    objectModificationLogLabel,
 #endif
 					    &status);
 		   if(!ARError( ret, status))
@@ -5631,6 +6270,7 @@ ars_SetFilter(ctrl, name, objDefRef)
 	  ARAccessNameType         owner;
 	  char                    *ownerPtr = NULL;
 	  char                    *changeDiary = CPNULL;
+	  char                    *objectModificationLogLabel = NULL;
 	  ARStatusList             status;
 	  ARWorkflowConnectStruct  *schemaList = NULL;
 	  ARPropList               *objPropList = NULL;
@@ -5713,14 +6353,14 @@ ars_SetFilter(ctrl, name, objDefRef)
 			rv += rev_ARFilterActionList(ctrl, objDef, "actionList", actionList);
 		}
 
-		if(hv_exists(objDef,  "objPropList", strlen("objPropList") )){
-			objPropList = (ARPropList*) MALLOCNN(sizeof(ARPropList));
-			rv += rev_ARPropList(ctrl, objDef, "objPropList", objPropList);
-		}
-
 		if(hv_exists(objDef,  "elseList", strlen("elseList") )){
 			elseList = (ARFilterActionList*) MALLOCNN(sizeof(ARFilterActionList));
 			rv += rev_ARFilterActionList(ctrl, objDef, "elseList", elseList);
+		}
+
+		if(hv_exists(objDef,  "objPropList", strlen("objPropList") )){
+			objPropList = (ARPropList*) MALLOCNN(sizeof(ARPropList));
+			rv += rev_ARPropList(ctrl, objDef, "objPropList", objPropList);
 		}
 #if AR_CURRENT_API_VERSION >= 13
 		if( hv_exists(objDef,"errorFilterOptions",18) ){
@@ -5747,6 +6387,9 @@ ars_SetFilter(ctrl, name, objDefRef)
 #if AR_CURRENT_API_VERSION >= 13
 					    errorFilterOptions,
 					    errorFilterNamePtr,
+#endif
+#if AR_CURRENT_API_VERSION >= 17
+					    objectModificationLogLabel,
 #endif
 					    &status);
 		   if(!ARError( ret, status))
@@ -5797,6 +6440,7 @@ ars_CreateEscalation(ctrl, objDefRef)
 	  char                  *helpText = CPNULL;
 	  ARAccessNameType       owner;
 	  char                  *changeDiary = CPNULL;
+	  char                  *objectModificationLogLabel = NULL;
 	  ARStatusList           status;
 	  ARNameList              schemaNameList;
 	  ARWorkflowConnectStruct schemaList;
@@ -5887,7 +6531,7 @@ ars_CreateEscalation(ctrl, objDefRef)
 
 		/* at this point all datastructures (hopefully) are 
 		 * built. we can call the api routine to create the
-		 * active link.
+		 * escalation.
 		 */
 		if(rv == 0) {
 		   ret = ARCreateEscalation(ctrl, name, 
@@ -5896,7 +6540,11 @@ ars_CreateEscalation(ctrl, objDefRef)
 					    enable, query,
 					    &actionList, &elseList, 
 					    helpText, owner, changeDiary, 
-					    &objPropList, &status);
+					    &objPropList,
+#if AR_CURRENT_API_VERSION >= 17
+					    objectModificationLogLabel,
+#endif
+					    &status);
 		   if(!ARError( ret, status))
 			   RETVAL = 1;
 		} else 
@@ -5943,6 +6591,7 @@ ars_SetEscalation(ctrl, name, objDefRef)
 	  ARAccessNameType         owner;
 	  char                    *ownerPtr = NULL;
 	  char                    *changeDiary = CPNULL;
+	  char                    *objectModificationLogLabel = NULL;
 	  ARStatusList             status;
 	  ARWorkflowConnectStruct  *schemaList = NULL;
 	  ARPropList               *objPropList = NULL;
@@ -6022,14 +6671,14 @@ ars_SetEscalation(ctrl, name, objDefRef)
 			rv += rev_ARFilterActionList(ctrl, objDef, "actionList", actionList);
 		}
 
-		if(hv_exists(objDef,  "objPropList", strlen("objPropList") )){
-			objPropList = (ARPropList*) MALLOCNN(sizeof(ARPropList));
-			rv += rev_ARPropList(ctrl, objDef, "objPropList", objPropList);
-		}
-
 		if(hv_exists(objDef,  "elseList", strlen("elseList") )){
 			elseList = (ARFilterActionList*) MALLOCNN(sizeof(ARFilterActionList));
 			rv += rev_ARFilterActionList(ctrl, objDef, "elseList", elseList);
+		}
+
+		if(hv_exists(objDef,  "objPropList", strlen("objPropList") )){
+			objPropList = (ARPropList*) MALLOCNN(sizeof(ARPropList));
+			rv += rev_ARPropList(ctrl, objDef, "objPropList", objPropList);
 		}
 
 		/* at this point all datastructures (hopefully) are 
@@ -6042,7 +6691,11 @@ ars_SetEscalation(ctrl, name, objDefRef)
 					    enable, query,
 					    actionList, elseList, 
 					    helpText, ownerPtr, changeDiary, 
-					    objPropList, &status);
+					    objPropList,
+#if AR_CURRENT_API_VERSION >= 17
+					    objectModificationLogLabel,
+#endif
+					    &status);
 		   if(!ARError( ret, status))
 			   RETVAL = 1;
 		} else 
@@ -6073,6 +6726,230 @@ ars_SetEscalation(ctrl, name, objDefRef)
 	RETVAL
 
 
+int
+ars_CreateImage(ctrl, objDefRef)
+	ARControlStruct *       ctrl
+    SV *                    objDefRef
+	CODE:
+	{
+	  ARStatusList           status;
+#if AR_CURRENT_API_VERSION >= 14
+	  int                    ret = 0, rv = 0;
+	  ARNameType             name;
+	  ARImageDataStruct      imageBuf;
+	  char                  *imageType   = CPNULL;
+	  char                  *description = CPNULL;
+	  char                  *helpText    = CPNULL;
+	  ARAccessNameType       owner;
+	  char                  *changeDiary = CPNULL;
+	  ARPropList             objPropList;
+	  char                  *objectModificationLogLabel = NULL;
+  
+	  RETVAL = 0; /* assume error */
+	  (void) ARError_reset();
+	  Zero(&status, 1,ARStatusList);
+	  Zero(name, 1, ARNameType);
+	  Zero(&imageBuf, 1,ARImageDataStruct);
+	  Zero(owner, 1, ARAccessNameType);
+	  Zero(&objPropList, 1, ARPropList);
+
+	  if(SvTYPE((SV *)SvRV(objDefRef)) != SVt_PVHV) {
+		ARError_add( AR_RETURN_ERROR, AP_ERR_EXPECT_PVHV);
+	  } else {
+		HV *objDef = (HV *)SvRV(objDefRef);
+
+		/* copy the various hash entries into the appropriate
+		 * data structure. if any are missing, we fail.
+		 */
+
+		rv  = 0;
+		rv += strcpyHVal( objDef, "name", name, sizeof(ARNameType));
+		rv += rev_ARImageDataStruct( ctrl, objDef, "imageData", &imageBuf );
+		rv += strmakHVal( objDef, "imageType", &imageType);
+
+		if(hv_exists(objDef, "description", strlen("description") ))
+			rv += strmakHVal( objDef, "description", &description);
+		
+		if(hv_exists(objDef,  "owner", strlen("owner") ))
+			rv += strcpyHVal( objDef, "owner", owner, 
+					sizeof(ARAccessNameType));
+		else
+			strncpy(owner, ctrl->user, sizeof(ARAccessNameType));
+		
+		/* these two are optional, so if the calls return warnings
+		 * it probably indicates that the hash keys don't exist and
+		 * we'll ignore it unless an actual failure code is returned.
+		 */
+
+		if(hv_exists(objDef,  "changeDiary", strlen("changeDiary") ))
+			rv += strmakHVal( objDef, "changeDiary", &changeDiary);
+		if(hv_exists(objDef,  "helpText", strlen("helpText") ))
+			rv += strmakHVal( objDef, "helpText", &helpText);
+
+		if(hv_exists(objDef,  "objPropList", strlen("objPropList") ))
+			rv += rev_ARPropList(ctrl, objDef, "objPropList",
+					     &objPropList);
+
+		/* at this point all datastructures (hopefully) are 
+		 * built. we can call the api routine to create the
+		 * image.
+		 */
+		if( rv == 0 ){
+		   ret = ARCreateImage( ctrl, name,
+					    &imageBuf, 
+					    imageType,
+					    description,
+					    helpText, owner, changeDiary, 
+					    &objPropList,
+#if AR_CURRENT_API_VERSION >= 17
+					    objectModificationLogLabel,
+#endif
+					    &status);
+		   if(!ARError( ret, status))
+			   RETVAL = 1;
+		}else{
+		   ARError_add( AR_RETURN_ERROR, AP_ERR_PREREVFAIL);
+		}
+	  }
+	  if (helpText) {
+	    	AP_FREE(helpText);
+	  }
+	  if (changeDiary) {
+	    	AP_FREE(changeDiary);
+	  }
+	  if (description) {
+	    	AP_FREE(description);
+	  }
+	  if (imageType) {
+	    	AP_FREE(description);
+	  }
+	  FreeARImageDataStruct(&imageBuf, FALSE);
+	  FreeARPropList(&objPropList, FALSE);
+#else	/* prior to ARS 7.5 */
+	  (void) ARError_reset();
+	  Zero(&status, 1, ARStatusList);
+	  (void) ARError_add( AR_RETURN_ERROR, AP_ERR_DEPRECATED,
+	  "ars_CreateImage() is only available in ARS >= 7.5");
+	  XSRETURN_UNDEF;
+#endif
+	}
+	OUTPUT:
+	RETVAL
+
+int
+ars_SetImage(ctrl, name, objDefRef)
+	ARControlStruct *       ctrl
+    ARNameType              name
+    SV *                    objDefRef
+	CODE:
+	{
+	  ARStatusList           status;
+#if AR_CURRENT_API_VERSION >= 14
+	  int                    ret = 0, rv = 0;
+	  ARNameType             newName;
+	  char                  *newNamePtr  = NULL;
+	  ARImageDataStruct     *imageBuf    = NULL;
+	  char                  *imageType   = CPNULL;
+	  char                  *description = CPNULL;
+	  char                  *helpText    = CPNULL;
+	  ARAccessNameType       owner;
+	  char                  *ownerPtr    = NULL;
+	  char                  *changeDiary = CPNULL;
+	  ARPropList            *objPropList = NULL;
+	  char                  *objectModificationLogLabel = NULL;
+	  
+	  RETVAL = 0; /* assume error */
+	  (void) ARError_reset();
+	  Zero(&status, 1,ARStatusList);
+	  Zero(newName, 1, ARNameType);
+	  Zero(owner, 1, ARAccessNameType);
+
+	  if(SvTYPE((SV *)SvRV(objDefRef)) != SVt_PVHV) {
+		ARError_add( AR_RETURN_ERROR, AP_ERR_EXPECT_PVHV);
+	  } else {
+		HV *objDef = (HV *)SvRV(objDefRef);
+
+		/* copy the various hash entries into the appropriate
+		 * data structure. if any are missing, we fail.
+		 */
+
+		rv  = 0;
+		if( hv_exists(objDef,"name",4) ){
+			rv += strcpyHVal( objDef, "name", newName, AR_MAX_NAME_SIZE ); 
+			newNamePtr = newName;
+		}
+		if(hv_exists(objDef,  "owner", strlen("owner") )){
+			rv += strcpyHVal( objDef, "owner", owner, sizeof(ARAccessNameType));
+			ownerPtr = owner;
+		}
+
+		if(hv_exists(objDef,  "changeDiary", strlen("changeDiary") ))
+			rv += strmakHVal( objDef, "changeDiary", &changeDiary);
+		if(hv_exists(objDef,  "helpText", strlen("helpText") ))
+			rv += strmakHVal( objDef, "helpText", &helpText);
+
+		if(hv_exists(objDef,  "imageType", strlen("imageType") ))
+			rv += strmakHVal( objDef, "imageType", &imageType);
+
+		if(hv_exists(objDef,  "imageData", strlen("imageData") )){
+			imageBuf = (ARImageDataStruct*) MALLOCNN(sizeof(ARImageDataStruct));
+			rv += rev_ARImageDataStruct(ctrl, objDef, "imageData", imageBuf);
+		}
+
+		if(hv_exists(objDef, "description", strlen("description") ))
+			rv += strmakHVal( objDef, "description", &description);
+		
+		if(hv_exists(objDef,  "objPropList", strlen("objPropList") )){
+			objPropList = (ARPropList*) MALLOCNN(sizeof(ARPropList));
+			rv += rev_ARPropList(ctrl, objDef, "objPropList", objPropList);
+		}
+
+		/* at this point all datastructures (hopefully) are 
+		 * built. we can call the api routine to create the
+		 * image.
+		 */
+		if( rv == 0 ){
+		   ret = ARSetImage( ctrl, name,
+		   			    newNamePtr,
+					    imageBuf, 
+					    imageType,
+					    description,
+					    helpText, owner, changeDiary, 
+					    objPropList,
+#if AR_CURRENT_API_VERSION >= 17
+					    objectModificationLogLabel,
+#endif
+					    &status);
+		   if(!ARError( ret, status))
+			   RETVAL = 1;
+		}else{
+		  ARError_add( AR_RETURN_ERROR, AP_ERR_PREREVFAIL);
+		}
+	  }
+	  if (helpText) {
+	    	AP_FREE(helpText);
+	  }
+	  if (changeDiary) {
+	    	AP_FREE(changeDiary);
+	  }
+	  if (description) {
+	    	AP_FREE(description);
+	  }
+	  if (imageType) {
+	    	AP_FREE(description);
+	  }
+	  if( imageBuf != NULL )     { FreeARImageDataStruct(imageBuf, TRUE); }
+	  if( objPropList != NULL )  { FreeARPropList(objPropList, TRUE);     }
+#else	/* prior to ARS 7.5 */
+	  (void) ARError_reset();
+	  Zero(&status, 1, ARStatusList);
+	  (void) ARError_add( AR_RETURN_ERROR, AP_ERR_DEPRECATED,
+	  "ars_SetImage() is only available in ARS >= 7.5");
+	  XSRETURN_UNDEF;
+#endif
+	}
+	OUTPUT:
+	RETVAL
 
 
 
@@ -6113,7 +6990,12 @@ ars_MergeEntry(ctrl, schema, mergeType, ...)
 	  		fieldList.fieldValueList[i].value.dataType = 
 				AR_DATA_TYPE_NULL;
 	  	} else {
-#if AR_EXPORT_VERSION >= 9
+#if AR_CURRENT_API_VERSION >= 17
+	  		ret = ARGetFieldCached(ctrl, schema, 
+				fieldList.fieldValueList[i].fieldId, 
+				NULL, NULL, &dataType, NULL, NULL, NULL, NULL, NULL, NULL,
+				NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, &status);
+#elif AR_EXPORT_VERSION >= 9
 	  		ret = ARGetFieldCached(ctrl, schema, 
 				fieldList.fieldValueList[i].fieldId, 
 				NULL, NULL, &dataType, NULL, NULL, NULL, NULL, NULL,
@@ -6141,7 +7023,12 @@ ars_MergeEntry(ctrl, schema, mergeType, ...)
 	  	}
 	  }
 
-	  ret = ARMergeEntry(ctrl, schema, &fieldList, mergeType, entryId, &status);
+	  ret = ARMergeEntry(ctrl, schema, &fieldList, mergeType, 
+#if AR_CURRENT_API_VERSION >= 18
+			NULL,     /* ARQualifier *query            */
+			0,        /* unsigned int multimatchOption */
+#endif
+			entryId, &status);
 #ifdef PROFILE
 	  ((ars_ctrl *)ctrl)->queries++;
 #endif	  
@@ -6164,9 +7051,8 @@ ars_GetMultipleEntries(ctrl,schema,...)
 	char *                  schema
 	PPCODE:
 	{
-#if AR_EXPORT_VERSION >= 4
 	int               ret = 0;
-        unsigned int      c = items - 3, i;
+    unsigned int      c = items - 3, i;
 	AREntryIdListList entryList;
 	ARInternalIdList  idList;
 	ARFieldValueListList  fieldList;
@@ -6291,12 +7177,6 @@ ars_GetMultipleEntries(ctrl,schema,...)
 	FreeAREntryIdListList(&entryList, FALSE);
 	FreeARFieldValueListList(&fieldList, FALSE);
 	FreeARBooleanList(&existList, FALSE);
-#else /* prior to ARS 4.0 */
-	(void) ARError_reset();
-	Zero(&status, 1, ARStatusList);
-	(void) ARError_add( AR_RETURN_ERROR, AP_ERR_DEPRECATED,
-		"ars_GetMultipleEntries() is only available in ARS >= 4.x");
-#endif
 	}
 
 
@@ -6310,7 +7190,6 @@ ars_GetListEntryWithFields(ctrl,schema,qualifier,maxRetrieve=0,firstRetrieve=0,.
 	PPCODE:
 	{
 	  ARStatusList     status;
-#if AR_EXPORT_VERSION >= 4
 	  unsigned int              c = (items - 5) / 2, i;
 	  int              field_off = 5;
 	  ARSortList       sortList;
@@ -6421,24 +7300,202 @@ ars_GetListEntryWithFields(ctrl,schema,qualifier,maxRetrieve=0,firstRetrieve=0,.
 	  FreeAREntryListFieldValueList( &entryFieldValueList,FALSE );
 	  FreeARSortList( &sortList, FALSE );
 	  FreeAREntryListFieldList( &getListFields, FALSE );
-#else	/* prior to ARS 4.0 */
-	  (void) ARError_reset();
-	  Zero(&status, 1, ARStatusList);
-	  (void) ARError_add( AR_RETURN_ERROR, AP_ERR_DEPRECATED,
-	  "ars_GetListEntryWithFields() is only available in ARS >= 4.x");
-#endif
 	}
 
 
 void
-ars_SetLogging( ctrl, logTypeMask, ...)
+ars_GetListEntryWithMultiSchemaFields(ctrl,schema,qualifier=NULL,maxRetrieve=0,firstRetrieve=0,fields=NULL,...)
+	ARControlStruct *    ctrl
+	SV *                 schema
+	SV *                 qualifier
+	unsigned int         firstRetrieve
+	unsigned int         maxRetrieve
+	SV *                 fields
+	PPCODE:
+	{
+	ARStatusList     status;
+#if AR_CURRENT_API_VERSION >= 14
+#if AR_CURRENT_API_VERSION >= 17
+	ARMultiSchemaFuncQueryFromList   queryFromList;
+	ARMultiSchemaFieldFuncList       getListFields;
+	ARMultiSchemaFieldFuncValueListList  entryFieldValueList;
+	ARMultiSchemaFieldIdList         *groupBy = NULL;   /* TODO: support as function argument */
+	ARMultiSchemaFuncQualifierStruct *having  = NULL;   /* TODO: support as function argument */
+#else
+	ARMultiSchemaQueryFromList       queryFromList;
+	ARMultiSchemaFieldIdList         getListFields;
+	ARMultiSchemaFieldValueListList  entryFieldValueList;
+#endif
+	ARMultiSchemaQualifierStruct     qualifierStruct;
+	ARMultiSchemaSortList            sortList;
+	unsigned int                     i;
+	int                              i2, field_off = 6;
+	int                              ret = 0, rv = 0;
+	HV                               *hDummy;
+
+	/* printf( "\n\n!!!! ars_GetListEntryWithMultiSchemaFields(): experimental implementation, not really working yet !!!!\n\n" ); */
+
+	(void) ARError_reset();
+#if AR_CURRENT_API_VERSION >= 17
+	Zero( &queryFromList, 1, ARMultiSchemaFuncQueryFromList );
+	Zero( &getListFields, 1, ARMultiSchemaFieldFuncList );
+	Zero( &entryFieldValueList, 1, ARMultiSchemaFieldFuncValueListList );
+#else
+	Zero( &queryFromList, 1, ARMultiSchemaQueryFromList );
+	Zero( &getListFields, 1, ARMultiSchemaFieldIdList );
+	Zero( &entryFieldValueList, 1, ARMultiSchemaFieldValueListList );
+#endif
+	Zero( &qualifierStruct, 1, ARMultiSchemaQualifierStruct );
+	Zero( &sortList, 1, ARMultiSchemaSortList );
+	Zero( &status, 1, ARStatusList );
+
+	hDummy = newHV();
+
+	if( !( SvROK(schema) && SvTYPE(SvRV(schema)) == SVt_PVAV ) ){
+		(void) ARError_add( AR_RETURN_ERROR, AP_ERR_GENERAL, "QueryFromList must be an ARRAY reference" );
+		goto getlistentry_multischema_end;
+	}
+	hv_store( hDummy, "queryFromList", 13, newSVsv(schema), 0 );
+#if AR_CURRENT_API_VERSION >= 17
+	rv += rev_ARMultiSchemaFuncQueryFromList( ctrl, hDummy, "queryFromList", &queryFromList );
+#else
+	rv += rev_ARMultiSchemaQueryFromList( ctrl, hDummy, "queryFromList", &queryFromList );
+#endif
+	if( qualifier && SvOK(qualifier) ){
+		if( !( SvROK(qualifier) && SvTYPE(SvRV(qualifier)) == SVt_PVHV ) ){
+			(void) ARError_add( AR_RETURN_ERROR, AP_ERR_GENERAL, "Qualifier must be a HASH reference" );
+			goto getlistentry_multischema_end;
+		}
+		hv_store( hDummy, "qualifierStruct", 15, newSVsv(qualifier), 0 );
+		rv += rev_ARMultiSchemaQualifierStruct( ctrl, hDummy, "qualifierStruct", &qualifierStruct );
+	}
+
+	if( fields && SvOK(fields) ){
+		if( !( SvROK(fields) && SvTYPE(SvRV(fields)) == SVt_PVAV ) ){
+			(void) ARError_add( AR_RETURN_ERROR, AP_ERR_GENERAL, "GetListFields must be an ARRAY reference" );
+			goto getlistentry_multischema_end;
+		}
+		hv_store( hDummy, "getListFields", 13, newSVsv(fields), 0 );
+#if AR_CURRENT_API_VERSION >= 17
+		rv += rev_ARMultiSchemaFieldFuncList( ctrl, hDummy, "getListFields", &getListFields );
+#else
+		rv += rev_ARMultiSchemaFieldIdList( ctrl, hDummy, "getListFields", &getListFields );
+#endif
+	}
+
+	if( items > field_off ){
+		int arg, c = (items - field_off) / 2;
+		if( (items - field_off) % 2 ){
+			(void) ARError_add( AR_RETURN_ERROR, AP_ERR_GENERAL, "Odd number of SortList arguments" );
+			goto getlistentry_multischema_end;
+		}
+
+		sortList.numItems = c;
+		sortList.listPtr = MALLOCNN( sizeof(ARMultiSchemaSortStruct) * c );
+		for( i2 = 0; i2 < c; ++i2 ){
+			arg = field_off + i2 * 2;
+			hv_store( hDummy, "_", 1, newSVsv(ST(arg)), 0 );
+			rv += rev_ARMultiSchemaFieldIdStruct( ctrl, hDummy, "_", &(sortList.listPtr[i2].fieldId) );
+			sortList.listPtr[i2].sortOrder = SvUV(ST(arg+1));
+		}
+	}
+
+
+	if( rv != 0 ){
+		ARError_add( AR_RETURN_ERROR, AP_ERR_PREREVFAIL );
+		goto getlistentry_multischema_end;
+	}
+
+	ret = ARGetListEntryWithMultiSchemaFields( ctrl,
+		&queryFromList,
+		&getListFields,
+		&qualifierStruct, 
+		&sortList, 
+		firstRetrieve,
+		maxRetrieve, 
+		FALSE,
+#if AR_CURRENT_API_VERSION >= 17
+		groupBy,
+		having,
+#endif
+		&entryFieldValueList,
+		NULL,                  /* TODO: numMatches */
+		&status );
+#ifdef PROFILE
+	((ars_ctrl *)ctrl)->queries++;
+#endif
+	if( ARError( ret, status) ){
+		goto getlistentry_multischema_end;
+	}
+#if AR_CURRENT_API_VERSION >= 17
+	for( i = 0; i < entryFieldValueList.numItems; ++i ){
+		HV * fieldValue_hash = newHV();
+		unsigned int field;
+		char keyStr[AR_MAX_NAME_SIZE + 1 + 12 + 1 + 12 + 1];
+
+		for( field = 0; field < entryFieldValueList.listPtr[i].numItems; ++field ){
+			ARMultiSchemaFieldFuncValueStruct *valPtr = &(entryFieldValueList.listPtr[i].listPtr[field]);
+			sprintf( keyStr, "%s.%ld.%ld", valPtr->fieldId.queryFromAlias, valPtr->fieldId.fieldId, valPtr->fieldId.funcId );
+			hv_store( fieldValue_hash,
+				keyStr, strlen(keyStr),
+				perl_ARValueStruct(ctrl, &(valPtr->value)),
+				0 );
+		}
+		XPUSHs( sv_2mortal( newRV_noinc((SV *)fieldValue_hash) ) );
+	}
+#else
+	for( i = 0; i < entryFieldValueList.numItems; ++i ){
+		HV * fieldValue_hash = newHV();
+		unsigned int field;
+		char keyStr[AR_MAX_NAME_SIZE + 1 + 12 + 1];
+
+		for( field = 0; field < entryFieldValueList.listPtr[i].numItems; ++field ){
+			ARMultiSchemaFieldValueStruct *valPtr = &(entryFieldValueList.listPtr[i].listPtr[field]);
+			sprintf( keyStr, "%s.%ld", valPtr->fieldId.queryFromAlias, valPtr->fieldId.fieldId );
+			hv_store( fieldValue_hash,
+				keyStr, strlen(keyStr),
+				perl_ARValueStruct(ctrl, &(valPtr->value)),
+				0 );
+		}
+		XPUSHs( sv_2mortal( newRV_noinc((SV *)fieldValue_hash) ) );
+	}
+#endif
+
+	getlistentry_multischema_end:
+	hv_undef( hDummy );
+#if AR_CURRENT_API_VERSION >= 17
+	FreeARMultiSchemaFieldFuncList( &getListFields, FALSE );
+	FreeARMultiSchemaFieldFuncValueListList( &entryFieldValueList, FALSE );
+#else
+	FreeARMultiSchemaFieldIdList( &getListFields, FALSE );
+	FreeARMultiSchemaFieldValueListList( &entryFieldValueList, FALSE );
+#endif
+	FreeARMultiSchemaSortList( &sortList, FALSE );
+#else	/* prior to ARS 7.5 */
+	(void) ARError_reset();
+	Zero(&status, 1, ARStatusList);
+	(void) ARError_add( AR_RETURN_ERROR, AP_ERR_DEPRECATED,
+	"ars_GetListEntryWithMultiSchemaFields() is only available in ARS >= 7.5");
+#endif
+	}
+
+
+
+void
+ars_SetLogging( ctrl, logTypeMask_arg, ...)
 	ARControlStruct *	ctrl
-	unsigned long           logTypeMask
+	unsigned long     logTypeMask_arg
 	PPCODE:
 	{
 #if AR_EXPORT_VERSION >= 5
 		ARStatusList     status;
+#if AR_CURRENT_API_VERSION >= 14
+		ARULong32        whereToWriteMask = AR_WRITE_TO_STATUS_LIST;
+		ARULong32        logTypeMask      = logTypeMask_arg;
+#else
 		unsigned long    whereToWriteMask = AR_WRITE_TO_STATUS_LIST;
+		unsigned long    logTypeMask      = logTypeMask_arg;
+#endif
 		int	             ret;
 		FILE             *logFilePtr = NULL;
 
@@ -6469,7 +7526,7 @@ ars_SetLogging( ctrl, logTypeMask, ...)
 				goto SetLogging_fail;
 			}
 			set_logging_file_ptr( logFilePtr );
-			/* printf( "GET logging_file_ptr = %p\n", logFilePtr ); */
+			/* printf( "SET logging_file_ptr = %p\n", logFilePtr ); */
 		}
 
 		ret = ARSetLogging( ctrl, logTypeMask, whereToWriteMask, logFilePtr, &status );
@@ -6518,7 +7575,6 @@ ars_SetSessionConfiguration( ctrl, variableId, value )
 		} else {
 			XPUSHs(sv_2mortal(newSViv(1))); /* OK */
 		}
-	/* SetSessionConfiguration_fail:; */
 #else /* < 5.0 */
 	  XPUSHs(sv_2mortal(newSViv(0))); /* ERR */
 	  (void) ARError_add( AR_RETURN_ERROR, AP_ERR_DEPRECATED, 
@@ -6551,11 +7607,10 @@ ars_SetImpersonatedUser( ctrl, impersonatedUser )
 		} else {
 			XPUSHs(sv_2mortal(newSViv(1))); /* OK */
 		}
-	/* SetSessionConfiguration_fail:; */
 #else /* < 7.0 */
-	  XPUSHs(sv_2mortal(newSViv(0))); /* ERR */
-	  (void) ARError_add( AR_RETURN_ERROR, AP_ERR_DEPRECATED, 
-			"SetImpersonatedUser() is only available in ARSystem >= 7.0");
+		XPUSHs(sv_2mortal(newSViv(0))); /* ERR */
+		(void) ARError_add( AR_RETURN_ERROR, AP_ERR_DEPRECATED, 
+			  "SetImpersonatedUser() is only available in ARSystem >= 7.0");
 #endif
 	}
 
@@ -6568,7 +7623,7 @@ ars_BeginBulkEntryTransaction( ctrl )
 	ARControlStruct *	ctrl
 	PPCODE:
 	{
-#if AR_EXPORT_VERSION >= 9
+#if AR_CURRENT_API_VERSION >= 11
 		ARStatusList     status;
 		int	             ret;
 
@@ -6582,12 +7637,10 @@ ars_BeginBulkEntryTransaction( ctrl )
 		}else{
 			XPUSHs(sv_2mortal(newSViv(1))); /* OK */
 		}
-#else /* < 7.0 */
-	  XPUSHs(sv_2mortal(newSViv(0))); /* ERR */
-	  (void) ARError_add( AR_RETURN_ERROR, AP_ERR_DEPRECATED, 
-			"BeginBulkEntryTransaction() is only available in ARSystem >= 7.0");
-      /* Not quite correct, the function exists since 6.3, but all 6.x versions have
-         AR_EXPORT_VERSION = 8 */
+#else /* < 6.3 */
+		XPUSHs(sv_2mortal(newSViv(0))); /* ERR */
+		(void) ARError_add( AR_RETURN_ERROR, AP_ERR_DEPRECATED, 
+			"BeginBulkEntryTransaction() is only available in ARSystem >= 6.3");
 #endif
 	}
 
@@ -6599,7 +7652,7 @@ ars_EndBulkEntryTransaction( ctrl, actionType )
 	unsigned int      actionType
 	PPCODE:
 	{
-#if AR_EXPORT_VERSION >= 9
+#if AR_CURRENT_API_VERSION >= 11
 		int	             ret;
 		ARStatusList     status;
 		ARBulkEntryReturnList returnList;
@@ -6614,22 +7667,237 @@ ars_EndBulkEntryTransaction( ctrl, actionType )
 		ARError( ret, status );
 
 		for( i = 0; i < returnList.numItems; i++ ){
-	        /* XPUSHs( sv_2mortal(newRV_noinc( perl_ARBulkEntryReturn(ctrl,&(returnList.entryReturnList[i])) )) ); */
-	        XPUSHs( sv_2mortal( perl_ARBulkEntryReturn(ctrl,&(returnList.entryReturnList[i])) ) );
+			XPUSHs( sv_2mortal( perl_ARBulkEntryReturn(ctrl,&(returnList.entryReturnList[i])) ) );
 		}
 
 		FreeARBulkEntryReturnList(&returnList, FALSE);
-#else /* < 7.0 */
-	  XPUSHs(sv_2mortal(newSViv(0))); /* ERR */
-	  (void) ARError_add( AR_RETURN_ERROR, AP_ERR_DEPRECATED, 
-			"BeginBulkEntryTransaction() is only available in ARSystem >= 7.0");
-      /* Not quite correct, the function exists since 6.3, but all 6.x versions have
-         AR_EXPORT_VERSION = 8 */
+#else /* < 6.3 */
+		XPUSHs(sv_2mortal(newSViv(0))); /* ERR */
+		(void) ARError_add( AR_RETURN_ERROR, AP_ERR_DEPRECATED, 
+			"BeginBulkEntryTransaction() is only available in ARSystem >= 6.3");
 #endif
 	}
 
 
+void
+ars_Signal( ctrl, ...)
+	ARControlStruct *	ctrl
+	PPCODE:
+	{
+#if AR_CURRENT_API_VERSION >= 9
+		int	             ret;
+		ARSignalList     signalList;
+		ARStatusList     status;
+		unsigned int     c = (items - 1) / 2, i = 0, a = 0, ok = 1;
 
+		(void) ARError_reset();
+		Zero(&signalList, 1, ARSignalList);
+		Zero(&status, 1, ARStatusList);
+
+		if( ((items - 1) % 2) || c < 1 ){
+			(void) ARError_add( AR_RETURN_ERROR, AP_ERR_BAD_ARGS);
+		}else{
+			signalList.numItems = c;
+			AMALLOCNN(signalList.signalList,c,ARSignalStruct);
+			for( i = 0; i < c; ++i ){
+				int st;
+				a = i * 2 + 1;
+
+				st = caseLookUpTypeNumber((TypeMapStruct *) 
+					SignalTypeMap,
+					SvPV(ST(a), PL_na) 
+				);
+				if( st == TYPEMAP_LAST ){
+					(void) ARError_add(AR_RETURN_ERROR, AP_ERR_TYPEMAP);
+					(void) ARError_add(AR_RETURN_ERROR, AP_ERR_CONTINUE,
+						SvPV(ST(a), PL_na) );
+					ok = 0;
+				}else{
+					signalList.signalList[i].signalType = st;
+					signalList.signalList[i].sigArgument = SvPV(ST(a+1),PL_na);
+				}
+			}
+		}
+
+		if( ok ){
+			ret = ARSignal( ctrl, &signalList, &status );
+		}
+
+		if( !ok || ARError(ret, status) ){
+			XPUSHs(sv_2mortal(newSViv(0))); /* ERR */
+		}else{
+			XPUSHs(sv_2mortal(newSViv(1))); /* OK */
+		}
+
+		FreeARSignalList(&signalList, FALSE);
+#else /* < 5.1 */
+		XPUSHs(sv_2mortal(newSViv(0))); /* ERR */
+		(void) ARError_add( AR_RETURN_ERROR, AP_ERR_DEPRECATED, 
+			"ars_Signal() is only supported for ARSystem >= 5.1");
+#endif
+	}
+
+
+SV *
+ars_GetTextForErrorMessage(msgId)
+	int  msgId
+	CODE:
+	{
+		char *msgTxt = NULL;
+		(void) ARError_reset();
+
+		msgTxt = ARGetTextForErrorMessage( msgId );
+		if( msgTxt != NULL ){
+			RETVAL = newSVpv( msgTxt, 0 );
+			free( msgTxt );
+		}else{
+			XSRETURN_UNDEF;
+		}
+	}
+	OUTPUT:
+	RETVAL
+
+
+void
+ars_ValidateMultipleLicenses(ctrl, ...)
+	ARControlStruct *	ctrl
+	PPCODE:
+	{
+		ARStatusList            status;
+		ARLicenseNameList       licNameList;
+		ARLicenseValidList      licValidList;
+		int                     ret = 0;
+		unsigned int            ui = 0, count = 0;
+		unsigned int            c = items - 1, i = 0, a = 0, ok = 1;
+
+		(void) ARError_reset();
+		Zero(&status, 1,ARStatusList);
+		Zero(&licNameList, 1, ARLicenseNameList);
+		Zero(&licValidList, 1, ARLicenseValidList);
+		if( items > 1){
+			licNameList.numItems = c;
+			AMALLOCNN(licNameList.nameList,c,ARLicenseNameType);
+			for( i = 0; i < c; ++i ){
+				a = i + 1;
+				strncpy( licNameList.nameList[i], SvPV(ST(a),PL_na), AR_MAX_LICENSE_NAME_SIZE );
+			}
+		}else{
+			ARError_add( AR_RETURN_ERROR, AP_ERR_BAD_ARGS);
+			ok = 0;
+		}
+
+		if( ok  ){
+			ret = ARValidateMultipleLicenses(ctrl, &licNameList, &licValidList, &status);
+
+			if( !ARError(ret,status) ){
+				if( licNameList.numItems != licValidList.numItems ){
+					(void) ARError_add(AR_RETURN_ERROR, AP_ERR_INV_RETURN);
+					(void) ARError_add(AR_RETURN_ERROR, AP_ERR_CONTINUE, "licNameList.numItems != licValidList.numItems");
+				}
+
+				for( ui = 0; ui < licValidList.numItems; ++ui ){
+					XPUSHs( sv_2mortal( newSVpv(licNameList.nameList[ui],0) ) );
+					XPUSHs( sv_2mortal( perl_ARLicenseValidStruct(ctrl,&(licValidList.licenseValidateInfoList[ui])) ) );
+				}
+			}
+		}
+		FreeARLicenseNameList(&licNameList, FALSE);
+		FreeARLicenseValidList(&licValidList, FALSE);
+	}
+
+
+int
+ars_DateToJulianDate(ctrl, year, month, day)
+	ARControlStruct *	ctrl
+	int         year;
+	int         month;
+	int         day;
+	CODE:
+	{
+#if AR_CURRENT_API_VERSION >= 9
+		int     ret = 0;
+		int     jd  = 0;
+		ARDateStruct  date;
+		ARStatusList  status;
+
+		(void) ARError_reset();
+		Zero(&date, 1, ARDateStruct);
+		Zero(&status, 1, ARStatusList);
+
+		date.year  = year;
+		date.month = month;
+		date.day   = day;
+
+		ret = ARDateToJulianDate(ctrl, &date, &jd, &status);
+		if (! ARError( ret, status)) {
+			RETVAL = jd;
+		}else{
+			XSRETURN_UNDEF;
+		}
+#else /* < 5.1 */
+		RETVAL = NULL; /* ERR */
+		(void) ARError_add( AR_RETURN_ERROR, AP_ERR_DEPRECATED, 
+			"ars_DateToJulianDate() is only supported for ARSystem >= 5.1");
+#endif
+	}
+	OUTPUT:
+	RETVAL
+
+
+SV *
+ars_GetServerCharSet( ctrl )
+	ARControlStruct *	ctrl
+	CODE:
+	{
+#if AR_CURRENT_API_VERSION >= 12
+		char          charSet[AR_MAX_LANG_SIZE+1];
+		ARStatusList  status;
+		int           ret = 0;
+
+		(void) ARError_reset();
+		Zero(&status, 1, ARStatusList);
+		RETVAL = NULL;
+
+		ret = ARGetServerCharSet( ctrl, charSet, &status );
+		if( ! ARError(ret,status) ){
+			RETVAL = newSVpv( charSet, 0 );
+		}
+#else /* < 7.0 */
+		RETVAL = NULL; /* ERR */
+		(void) ARError_add( AR_RETURN_ERROR, AP_ERR_DEPRECATED, 
+			"ars_GetServerCharSet() is only available in ARSystem >= 7.0");
+#endif
+	}
+	OUTPUT:
+	RETVAL
+
+
+SV *
+ars_GetClientCharSet( ctrl )
+	ARControlStruct *	ctrl
+	CODE:
+	{
+#if AR_CURRENT_API_VERSION >= 12
+		char          charSet[AR_MAX_LANG_SIZE+1];
+		ARStatusList  status;
+		int           ret = 0;
+
+		(void) ARError_reset();
+		Zero(&status, 1, ARStatusList);
+		RETVAL = NULL;
+
+		ret = ARGetClientCharSet( ctrl, charSet, &status );
+		if( ! ARError(ret,status) ){
+			RETVAL = newSVpv( charSet, 0 );
+		}
+#else /* < 7.0 */
+		RETVAL = NULL; /* ERR */
+		(void) ARError_add( AR_RETURN_ERROR, AP_ERR_DEPRECATED, 
+			"ars_GetClientCharSet() is only available in ARSystem >= 7.0");
+#endif
+	}
+	OUTPUT:
+	RETVAL
 
 
 
@@ -6887,11 +8155,25 @@ DESTROY(ctrl)
 # endif /* AR_EXPORT_VERSION */
 		(void) ARError(rv, status);
 #ifdef PROFILE
-		free(ctrl);
+		AP_FREE(ctrl);
 #else
 		safefree(ctrl);
 #endif
 	}
+
+
+char *
+field_cache_key(ctrl)
+	ARControlStruct *	ctrl
+	CODE:
+	{
+	  char     server_tag[100];
+	  sprintf( server_tag, "%s:%p", ctrl->server, ctrl );
+	  RETVAL = server_tag;
+	}
+	OUTPUT:
+	RETVAL
+
 
 MODULE = ARS		PACKAGE = ARQualifierStructPtr
 

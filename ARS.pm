@@ -64,14 +64,9 @@ require Carp unless $^S;
 use AutoLoader 'AUTOLOAD';
 use Config;
 
-require 'ARSar-h.pm';
-require 'ARSarerrno-h.pm';
-require 'ARSnt-h.pm';
-require 'ARSnterrno-h.pm';
-require 'ARSnparm.pm';
-require 'ARSOOform.pm';
-require 'ARSOOmsgs.pm';
-require 'ARSOOsup.pm';
+require 'ARS/ar-h.pm';
+require 'ARS/arerrno-h.pm';
+require 'ARS/nparm.pm';
 
 @ARS::ISA = qw(Exporter DynaLoader);
 @ARS::EXPORT = qw(isa_int isa_float isa_string ars_LoadQualifier ars_Login 
@@ -80,7 +75,7 @@ ars_DeleteEntry ars_GetEntry ars_GetListEntry ars_GetListSchema
 ars_GetListServer ars_GetActiveLink ars_GetCharMenuItems ars_GetSchema 
 ars_ExpandCharMenu
 ars_GetField ars_simpleMenu ars_GetListActiveLink ars_SetEntry 
-ars_perl_qualifier ars_Export ars_GetListFilter ars_GetListEscalation 
+ars_perl_qualifier ars_qualifier_ptr ars_Export ars_GetListFilter ars_GetListEscalation 
 ars_GetListCharMenu ars_padEntryid 
 ars_GetFilter ars_SetFilter
 ars_GetListEntryWithFields ars_GetMultipleEntries
@@ -92,7 +87,7 @@ ars_DeleteCharMenu
 ars_DeleteEscalation ars_DeleteField ars_DeleteSchema
 ars_DeleteVUI ars_ExecuteProcess
 ars_GetEscalation ars_GetFullTextInfo
-ars_GetListGroup ars_GetListSQL ars_GetListUser
+ars_GetListGroup ars_GetListSQL ars_GetListUser ars_GetListRole
 ars_GetListVUI 
 ars_GetServerInfo ars_SetServerInfo
 ars_GetEntryBLOB
@@ -106,11 +101,16 @@ ars_SetActiveLink ars_CreateFilter ars_CreateEscalation ars_SetEscalation
 $ars_errstr %ARServerStats %ars_errhash
 ars_decodeStatusHistory ars_APIVersion ars_encodeStatusHistory
 ars_BeginBulkEntryTransaction ars_EndBulkEntryTransaction
+ars_Signal ars_GetTextForErrorMessage ars_DateToJulianDate
+ars_GetListLicense ars_ValidateMultipleLicenses
+ars_GetServerCharSet ars_GetClientCharSet
 ars_GetAlertCount ars_RegisterForAlerts ars_DeregisterForAlerts ars_GetListAlertUser
 ars_DecodeAlertMessage ars_CreateAlertEvent ars_VerifyUser
+ars_GetListImage ars_GetImage ars_CreateImage ars_SetImage ars_DeleteImage
+ars_GetListEntryWithMultiSchemaFields
 );
 
-$ARS::VERSION   = '1.91';
+$ARS::VERSION   = '1.93';
 $ARS::DEBUGGING = 0;
 
 $ARS::logging_file_ptr = 0;
@@ -216,6 +216,14 @@ tie $ARS::ars_errstr, ARS::ERRORSTR;
  'ESCL_FIELDS_FLTAPI', 73,
  'WRITE_RESTRICTED_READ', 74
 );
+
+
+sub new {
+	require 'ARS/OOform.pm';
+	require 'ARS/OOmsgs.pm';
+	require 'ARS/OOsup.pm';
+	return newObject( @_ );
+}
 
 
 # ROUTINE

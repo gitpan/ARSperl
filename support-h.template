@@ -1,5 +1,5 @@
 /*
-$Header: /cvsroot/arsperl/ARSperl/support-h.template,v 1.33 2007/04/21 22:22:06 tstapff Exp $
+$Header: /cvsroot/arsperl/ARSperl/support-h.template,v 1.37 2010/09/01 17:18:29 tstapff Exp $
 
     ARSperl - An ARS v2 - v5 / Perl5 Integration Kit
 
@@ -75,7 +75,7 @@ $Header: /cvsroot/arsperl/ARSperl/support-h.template,v 1.33 2007/04/21 22:22:06 
 #endif
 
 #define SAFEPRT(X) (X && *X)? X : "[null]"
-#ifdef ARSPDEBUG
+#ifdef ARSPERL_DEBUG
 # define DBG(X) printf("[%s %d] %s : ", __FILE__, __LINE__, __FUNCTION__); printf X
 #else
 # define DBG(X)
@@ -335,6 +335,14 @@ static struct {
   { TYPEMAP_LAST, NULL }
 };
 
+static struct {
+  unsigned int number;
+  char *name;
+} SignalTypeMap[] = {
+/*SIGNALTYPEMAP*/
+  { TYPEMAP_LAST, NULL }
+};
+
 /*SERVERINFOTYPEHINTS*/
 #include "serverTypeInfoHints.h"
 
@@ -451,24 +459,30 @@ EXTERN SV *perl_ARFieldValueOrArithStruct( ARControlStruct *ctrl,
 EXTERN SV *perl_relOp(ARControlStruct *ctrl, ARRelOpStruct *);
 EXTERN HV *perl_qualifier(ARControlStruct *ctrl,  ARQualifierStruct *);
 EXTERN int ARGetFieldCached( ARControlStruct *, ARNameType, ARInternalId,
-#if AR_EXPORT_VERSION >= 3
 		     ARNameType, ARFieldMappingStruct *,
-#endif
 		     unsigned int *, unsigned int *,
 		     unsigned int *, 
-#if AR_EXPORT_VERSION >= 9
+#if AR_CURRENT_API_VERSION >= 12
 		     unsigned int *, 
 #endif
 		     ARValueStruct *,
-		     ARPermissionList *, ARFieldLimitStruct *,
-#if AR_EXPORT_VERSION >= 3
-		     ARDisplayInstanceList *,
-#else
-		     ARDisplayList *,
+#if AR_CURRENT_API_VERSION >= 17
+		     ARPermissionList *assignedGroupList,
 #endif
+		     ARPermissionList *, ARFieldLimitStruct *,
+		     ARDisplayInstanceList *,
 		     char **, ARTimestamp *,
 		     ARNameType, ARNameType, char **,
+#if AR_CURRENT_API_VERSION >= 17
+			 ARPropList *objPropList,
+#endif
 		     ARStatusList *);
+
+EXTERN HV *fieldcache_get_schema_fields( ARControlStruct *ctrl, char *form_name, int load_if_incomplete );
+EXTERN int fieldcache_store_field_info( HV *fields, ARInternalId fieldId, ARNameType fieldName, unsigned int dataType, char ** attrs );
+EXTERN int fieldcache_load_schema( ARControlStruct *ctrl, char *schema, ARInternalIdList *fieldIds, char **attrs );
+EXTERN unsigned int fieldcache_get_data_type( HV *fields, ARInternalId fieldId );
+
 EXTERN int sv_to_ARValue(ARControlStruct *ctrl, 
 			 SV *in, unsigned int dataType, ARValueStruct *out);
 #if AR_EXPORT_VERSION >= 7
@@ -488,6 +502,9 @@ EXTERN SV *perl_ARJoinSchema(ARControlStruct *ctrl,  ARJoinSchema *);
 EXTERN SV *perl_ARViewSchema(ARControlStruct *ctrl,  ARViewSchema *);
 EXTERN SV *perl_ARCompoundSchema(ARControlStruct *ctrl,  ARCompoundSchema *);
 EXTERN SV *perl_ARSortList(ARControlStruct *ctrl,  ARSortList *);
+#if AR_CURRENT_API_VERSION >= 14
+EXTERN SV *perl_ARImageDataStruct(ARControlStruct * ctrl, ARImageDataStruct * in);
+#endif
 EXTERN SV *perl_ARByteList(ARControlStruct *ctrl,  ARByteList *);
 EXTERN SV *perl_ARCoordStruct(ARControlStruct *ctrl,  ARCoordStruct *);
 EXTERN int perl_BuildEntryList(ARControlStruct *ctrl,  AREntryIdList *entryList, 
@@ -539,8 +556,10 @@ EXTERN SV *perl_ARCurrencyDetailList(ARControlStruct * ctrl,
 #if AR_EXPORT_VERSION >= 8L
 EXTERN SV *perl_ARArchiveInfoStruct(ARControlStruct *ctrl,  ARArchiveInfoStruct *);
 #endif
-#if AR_EXPORT_VERSION >= 9L
+#if AR_CURRENT_API_VERSION >= 12
 EXTERN SV *perl_ARAuditInfoStruct( ARControlStruct *ctrl, ARAuditInfoStruct *);
+#endif
+#if AR_CURRENT_API_VERSION >= 11
 EXTERN SV *perl_ARBulkEntryReturn( ARControlStruct *ctrl, ARBulkEntryReturn *);
 EXTERN SV *perl_AREntryReturn( ARControlStruct *ctrl, AREntryReturn *);
 EXTERN SV *perl_ARXMLEntryReturn( ARControlStruct *ctrl, ARXMLEntryReturn *);
@@ -555,6 +574,13 @@ EXTERN SV *perl_ARFieldValueStruct( ARControlStruct *ctrl, ARFieldValueStruct *p
 EXTERN SV *perl_ARCharMenuList( ARControlStruct *ctrl, ARCharMenuList *p );
 EXTERN SV *perl_ARCharMenuItemStruct( ARControlStruct *ctrl, ARCharMenuItemStruct *p );
 EXTERN SV *perl_ARCharMenuStruct( ARControlStruct *ctrl, ARCharMenuStruct *p );
+
+#if AR_CURRENT_API_VERSION >= 13
+EXTERN SV *perl_ARActiveLinkSvcActionStruct( ARControlStruct *ctrl, ARActiveLinkSvcActionStruct *p );
+#endif
+
+EXTERN SV *perl_ARLicenseDateStruct( ARControlStruct *ctrl, ARLicenseDateStruct *p );
+EXTERN SV *perl_ARLicenseValidStruct( ARControlStruct *ctrl, ARLicenseValidStruct *p );
 
 
 #ifndef BSD
@@ -593,7 +619,7 @@ int  copymem(MEMCAST *m1, MEMCAST *m2, int size);
  */
 
 #define CVLD(X) (X && *X)
-#define IVLD(X, L, H) ((X <= H) && (L >= X))
+#define IVLD(X, L, H) ((L <= X) && (X <= H))
 
 #define VNAME(X) X, strlen(X)
 
@@ -636,5 +662,8 @@ int  copymem(MEMCAST *m1, MEMCAST *m2, int size);
 #define AP_ERR_INV_ARITH    80027 /*, "Unknown arith operation in ARArithOpStruct" */
 #define AP_ERR_ENUM_LISTSTYLE 80028, "Unknown EnumLimits listStyle"
 #define AP_ERR_CURRENCY_STRUCT 80029, "Bad currency struct hash (missing a key or a key had an unexpected value)"
+#define AP_ERR_TYPEMAP      80030, "Cannot resolve typemap value"
+#define AP_ERR_INV_RETURN   80031, "Invalid return data"
+#define AP_ERR_DATATYPE     80032, "Unsupported data type"
 
 #endif /* __support_h_ */

@@ -77,12 +77,12 @@ void copyUIntArray( int size, ARInternalId *dst, SV* src );
 #include "support.h"
 
 
-/* #if defined(malloc) && defined(_WIN32)
+#if defined(ARSPERL_UNDEF_MALLOC) && defined(malloc)
  #undef malloc
  #undef calloc
  #undef realloc
  #undef free
-#endif */
+#endif
 
 
 @> foreach my $class ( @classes_C ){
@@ -350,7 +350,7 @@ rev_<@ $class @>( ARControlStruct *ctrl, HV *h, char *k, <@ $class @> *p ){
 		SV **val;
 		strncpy( k, "<@ $key2 @>", 255 );
 		val = hv_fetch( h, "<@ $key2 @>", <@ length($key2) @>, 0 );
-		if( val	&& *val ){
+		if( val && *val && <@ ($obj->{$key}{_type} eq 'ARValueStruct')? '(SvOK(*val) || SvTYPE(*val) == SVt_NULL)' : 'SvOK(*val)' @> ){
 @>             perlToStruct( $obj->{$key}, $class, "$LINE_INDENT\t\t\t" );
 		}else{
 @>             if( $obj->{$key}{_default} ){
@@ -384,7 +384,7 @@ void copyIntArray( int size, int *dst, SV* src ){
 		if( i <= len ){ 
 			SV** item = av_fetch( ar, i, 0 );
 			if( item != NULL && *item != NULL && i <= len ){
-				dst[i] = SvIV( *item );
+				dst[i] = (SvOK(*item))? SvIV(*item) : 0;
 			}
 		}
 	}
@@ -399,7 +399,7 @@ void copyUIntArray( int size, ARInternalId *dst, SV* src ){
 		if( i <= len ){ 
 			SV** item = av_fetch( ar, i, 0 );
 			if( item != NULL && *item != NULL && i <= len ){
-				dst[i] = SvUV( *item );
+				dst[i] = (SvOK(*item))? SvUV(*item) : 0;
 			}
 		}
 	}
@@ -588,10 +588,12 @@ sub findSubKey {
 
 sub versionIf {
 	my( $obj ) = @_;
-	if( $obj->{_min_version} ){
-		return '#if AR_EXPORT_VERSION >= ' . $EXPORT_VERSION{$obj->{_min_version}};
+	if( $obj->{_min_version} && $obj->{_max_version} ){
+		return '#if AR_CURRENT_API_VERSION >= '. $CURRENT_API_VERSION{$obj->{_min_version}} .' && AR_CURRENT_API_VERSION <= '. $CURRENT_API_VERSION{$obj->{_max_version}};
+	}elsif( $obj->{_min_version} ){
+		return '#if AR_CURRENT_API_VERSION >= ' . $CURRENT_API_VERSION{$obj->{_min_version}};
 	}elsif( $obj->{_max_version} ){
-		return '#if AR_EXPORT_VERSION <= ' . $EXPORT_VERSION{$obj->{_max_version}};
+		return '#if AR_CURRENT_API_VERSION <= ' . $CURRENT_API_VERSION{$obj->{_max_version}};
 	}else{
 		return '';
 	}

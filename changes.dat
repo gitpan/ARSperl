@@ -1,6 +1,41 @@
+released=08/01/2011 version=1.93
+TS  fixed exsi.pl enumeration gap problem
+TS  added lengthUnits,storageOptionForCLOB attributes to ARCharLimitsStruct,ARDisplayLimits
+TS  fixed ars_GetServerInfo() keys 325-332 problem
+TS  modifications for AR 7.6.3 API
+TS  ars_GetEntryBLOB bugfix by Conny Martin
+TS  fixed "hv_fetch error" problem in case of undefined ARValueStruct 
+TS  fixed SignalTypeMap problem
+TS  package directory reorganization/cleanup
+TS  additional ars_Login parameters by Conny Martin
+TS  implemented ars_GetList/Get/Create/Set/DeleteImage
+TS  fixed incorrect AR_ARITH_OP_NEGATE handling in rev_ARArithOpStruct
+TS  fixed wrong operand evaluation for AR_ARITH_OP_NEGATE in perl_ARArithOpStruct
+TS  fixed ars_SetServerInfo() memory violation in case of more than one key/value pair
+TS  ars_GetFieldTable performance improvement by using ARGetMultipleFields
+TS  removed unnecessary second invocation of ARGetField in ars_GetField
+TS  code cleanup (#ifdef statements) in ARGetFieldCached, ars_GetField, ars_GetFieldByName
+!TS  appended ARControlStruct pointer address to server key in %ARS::field_cache
+    (affects only scripts which make explicit use of the internal field_cache structure)
+!CL  enhanced ARS OO interface to handle custom enum fields
+TS  fixed return value of ars_Import
+TS  fixed memory violation in ars_GetListContainer
+TS  implemented ars_qualifier_ptr function (inverse of ars_perl_qualifier)
+TS  added ownerObjList parameter to ars_GetListContainer
+TS  fixed AR_SERVER_INFO type identification in infra/exsi.pl
+TS  updated version numbers in INSTALLATION
+TS  added ars_DateToJulianDate, ars_GetListLicense, ars_ValidateMultipleLicenses,
+    ars_GetServerCharSet, ars_GetClientCharSet
+TS  fixed actionList/elseList bug in ars_SetActiveLink
+TS  added AR_DATA_TYPE_VIEW handling to perl_ARValueStruct_Assign,rev_ARActiveLinkActionList
+TS  modified Makefile.PL for easier automated testing (handling of ARSPERLTEST_PARAM)
+TS  added ars_GetListRole, ars_Signal, ars_GetTextForErrorMessage
+!TS  changed return struct of ars_GetListGroup
+TS  fixed IVLD macro in support-h.template
+
 released=05/06/2008 version=1.91
 TS  fixed ars_padEntryid to work correctly if entry ID prefix is defined
-TS  malloc-on-windows patch commented out because of crash with API 6.3.0
+TS  replaced malloc-on-windows patch by UNDEF_PERL_MALLOC compilation option in Makefile.PL
 TS  fixed pointer initialization error in ars_SetVUI
 TS  modified ars_Create/Get/SetFilter for API 7.1
 TS  fixed ars_GetAlertCount
@@ -15,7 +50,7 @@ TS  fixed memory leak in ars_Get... functions (added "sv_2mortal( (SV*) RETVAL )
 TS  bugfix in dup_Value (support.c) for API version <= 5.0.1
 TS  changed enum limits processing in perl_ARFieldLimitStruct for API version <= 5.0.1
 TS  updated MANIFEST file
-TS  replaced strdup() by arsperl_strdup() form win32 to fix problems with VisualStudio8
+TS  replaced strdup() by arsperl_strdup() for win32 to fix problems with VisualStudio8
 TS  changed type of "owner" attribute: ARNameType -> ARAccessNameType
 TS  corrected function signature for ars_SetVUI, ars_CreateSchema
 TS  fixed memory leak in sv_to_ARValue (support.c)

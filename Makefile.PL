@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl
 #
-# $Header: /cvsroot/arsperl/ARSperl/Makefile.PL,v 1.79 2007/09/13 22:50:25 tstapff Exp $
+# $Header: /cvsroot/arsperl/ARSperl/Makefile.PL,v 1.88 2011/07/29 13:05:27 tstapff Exp $
 #
 # ARSperl Makefile
 #
@@ -21,21 +21,21 @@ use Cwd;
 
 $debug = 0;
 
-###### There are THREE (3) steps to complete. Complete all of them. ######
+###### There are FOUR (4) steps to complete. Complete all of them. ######
 
 # STEP 1 -> Set the path to your ARS API directory
 
-$ARSAPI     = "/usr/ar/api";
+$ARSAPI      = "C:/Replication/Remedy/7.6.4";
+#$ARSAPI      = "/usr/ar/api";
 #$ARSAPI     = "/u1/project/ARSperl/api/sol2/api6.0.1";
-#$ARSAPI     = "/u1/project/ARSperl/api/linux/4.5";
-#$ARSAPI     = "/u1/project/ARSperl/api/linux/4.0";
 #$ARSAPI     = "/u1/project/ARSperl/api/sol2/api6.3";
-#$ARSAPI     = "/u1/project/ARSperl/api/linux/7.0.1p1";
+<<<<<<< Makefile.PL
+$ARSAPI     = "/jeff/project/ARSperl/api/linux/7.1";
+=======
+#$ARSAPI     = "/u1/project/ARSperl/api/linux/7.1.0p8";
+>>>>>>> 1.88
 #$ARSAPI     = "/u1/project/ARSperl/api/sol2/api5.1.1";
 # $ARSAPI     = "/home/jcmurphy/arsperl/api/5.1";
-# $ARSAPI     = q{\\\\ess7\devkits\ars\4.5\drops\drop4.5FCS\winnt};
-# $ARSAPI     = q{\\\\ess7\devkits\ars\4.5\drops\drop4.5.1FCS\winnt};
-# $ARSAPI     = q{\\\\ess7\devkits\ars\4.5\drops\drop4.5.2FCS\winnt};
 # $ARSAPI     = q{\\\\ess7\devkits\ars\5.0\fcs\winnt};
 # $ARSAPI     = q{\\\\ess7\devkits\ars\5.0.1\fcs\winnt};
 # $ARSAPI     = q{\\\\ess7\devkits\ars\5.1\fcs\winnt};
@@ -49,24 +49,59 @@ $ARSAPI     = "/usr/ar/api";
 
 # STEP 2 -> Choose your version of ARS FROM THE FOLLOWING LIST
 #
-#                  2.0 2.1 3.0 3.1 3.2 4.0 4.52 5.0 6.0 6.01 6.3 7.0 7.1
+<<<<<<< Makefile.PL
+#                  5.0 6.0 6.01 6.3 7.0 7.1 7.5
+=======
+#                  5.0 6.0 6.01 6.3 7.0 7.1 7.5 7.6
+>>>>>>> 1.88
 #
 #           notes
-#            - if there is a maintenace number (e.g. 4.5.2)
-#              then use "4.52" NOT "4.5.2"
+#            - if there is a maintenace number (e.g. 6.0.1)
+#              then use "6.01" NOT "6.0.1"
 #            - ONLY use the choices listed above. note that
 #              not all versions are on the list. specify the
 #              version that is closest to yours without exceeding
 #              your version (e.g. for 4.5 you would specify 4.0, NOT
 #	       4.52)
 #
+<<<<<<< Makefile.PL
 $ARSVERSION = 7.1;
+=======
+$ARSVERSION = 7.6;
+>>>>>>> 1.88
 
-# STEP 3 -> Choose whether or not to enable encryption
+
+# STEP 3 -> Choose architecture dependent suffix for library names, if necessary
+$ARCHITECTURE = "";
+# $ARCHITECTURE = "hpia32":   # HPUX Itanium 32-bit
+# $ARCHITECTURE = "hpia64":   # HPUX Itanium 64-bit
+# $ARCHITECTURE = "hppa64":   # HPUX PA-RISC 64-bit
+# $ARCHITECTURE = "lx64":   # Linux 64-bit
+# $ARCHITECTURE = "aixp64":   # AIX 64-bit
+# $ARCHITECTURE = "solsp64":   # Solaris 64-bit
+
+
+# STEP 4 -> Choose whether or not to enable encryption
 #
 # 0 -> No encryption library linking
 # 1 -> Link against Remedy's encryption library
 $ENCRYPT = 0;
+
+
+# STEP 5 -> Some additional compilation options
+#  
+#   Change this only if you have good reason to do so.
+#
+%ADVANCED_CONFIG = (
+	
+	# you might try this if you experience memory violations
+	UNDEF_PERL_MALLOC       => 0,
+
+	# set to 1 if you need a backwards compatible version of ars_GetListGroup
+	# (see the manual page of ars_GetListGroup for a more specific description)
+	GETLISTGROUP_OLD_STYLE  => 0,
+);
+
 
 # my $AR_API_VERSION = findAPIVersion($ARSAPI);
 # print "found API Version: $AR_API_VERSION\n";
@@ -76,9 +111,6 @@ $ENCRYPT = 0;
 # }
 # print "derived server version from ar.h: $SERVER_VERSION\n";
 
-my $ra_arlibs = findArLibs($ARSAPI);
-# use Data::Dumper;
-# print "found ar libraries: ", Dumper($ra_arlibs);
 
 
 ##############################
@@ -87,114 +119,65 @@ my $ra_arlibs = findArLibs($ARSAPI);
 # does, try subscribing to the mailing list and ask for help there.
 # subscription information is available at http://www.arsperl.org/
 
-$WINDOWS = ($^O eq 'MSWin32');
 
-#        Windows NT: no "-lpthread"
-#        NCR UNIX: add "-lc -lnet"
-#                -DARSPDEBUG
+if( $ENV{ARSPERLTEST_PARAM} ){
+	( $ARSVERSION, $ARSAPI, $ARSPERLTEST_SERVER, $ARSPERLTEST_USERNAME, $ARSPERLTEST_PASSWORD, $ARSPERLTEST_TCPPORT )
+		= split( /;/, $ENV{ARSPERLTEST_PARAM} );
+}
+my $ra_arlibs = findArLibs($ARSAPI);
+# use Data::Dumper;
+# print "found ar libraries: ", Dumper($ra_arlibs);
+
+
+
+$WINDOWS = $^O eq 'MSWin32';
+$GNU_WIN = ($^O eq 'MSWin32' || $^O eq 'cygwin') && $Config{'cc'} eq "gcc";
+
+
 $AUTODEFINES = " -g ";
 $AUTODEFINES = " -D_WIN32 " if($WINDOWS);
 $AUTODEFINES .= "  -Wno-unused-variable -Wuninitialized " if $Config{'cc'} eq "gcc";
+$AUTODEFINES .= " -D_CRT_SECURE_NO_DEPRECATE -D_CRT_NONSTDC_NO_WARNINGS " if $WINDOWS && $ENV{ARSPERLTEST_PARAM};
+
+$AUTODEFINES .= " -DARSPERL_UNDEF_MALLOC "   if $ADVANCED_CONFIG{UNDEF_PERL_MALLOC};
+$AUTODEFINES .= " -DGETLISTGROUP_OLD_STYLE " if $ADVANCED_CONFIG{GETLISTGROUP_OLD_STYLE};
+
+$AUTODEFINES .= " -DARSPERL_DEBUG " if $debug;
 
 
 $ARS_STATIC_LIB = "";
 
-$PM = {};
-foreach my $pm2install (qw{ARSarerrno-h.pm  ARSar-h.pm  ARSnparm.pm  ARSnterrno-h.pm  ARSnt-h.pm  ARSOOform.pm  ARSOOmsgs.pm  ARSOOsup.pm  ARS.pm}) {
-	$PM->{$pm2install} = '$(INST_LIBDIR)/'.$pm2install;
+$PM = { 'ARS.pm' => '$(INST_LIBDIR)/ARS.pm' };
+foreach my $pm2install (qw{arerrno-h.pm  ar-h.pm  nparm.pm  OOform.pm  OOmsgs.pm  OOsup.pm}) {
+	$PM->{'ARS/'.$pm2install} = '$(INST_LIBDIR)/ARS/'.$pm2install;
 }
 
-if ($ARSVERSION >= 7.0) {
-	$ARS_STATIC_LIB = $ARSAPI."/lib/libar.a";
-	$ARS_LIBS = "";
-	$PM->{'artypes.ph'} = '$(INST_LIBDIR)/artypes.ph';
-	if ($WINDOWS) {
-		$ARS_LIBS = join(' ', map { '-l' . $_ } @{$ra_arlibs});
-	} else {
-		$ARS_LIBS .= " -lpthread -licuucbmc -licui18nbmc";
-	}
-	$AUTODEFINES .= " -DARS32 ";
-	$AUTODEFINES .= " -DARS452 " if($ARSVERSION >= 4.52);
-	if ( ($ARSVERSION >= 5.0) && ($^O eq 'linux') ) {
-		$AUTODEFINES .= " -malign-double ";
-	}
+$LARCH = $ARCHITECTURE ? "_".$ARCHITECTURE : "";
+
+
+if ($ARSVERSION >= 6.3) {
+	$ARS_STATIC_LIB = "$ARSAPI/lib/libar$LARCH.a";
+	$ARS_STATIC_LIB = "$ARSAPI/lib/libar$LARCH.a $ARSAPI/libarencrypt$LARCH.a" if $ENCRYPT;
+	$ARS_LIBS = " -lnsl ";
+}else{
+	$ARS_LIBS = " -lar$LARCH -lnsl ";
+	$ARS_LIBS = " -lar$LARCH -larencrypt$LARCH -lnsl " if $ENCRYPT;
+}
+#$PM->{'ARS/artypes.ph'} = '$(INST_LIBDIR)/ARS/artypes.ph' if $ARSVERSION >= 6.3;
+if ($GNU_WIN) {
+	$ARS_LIBS = join(' ', map { "$ARSAPI/lib/" . $_ } @{$ra_arlibs});
+} elsif ($WINDOWS) {
+	$ARS_LIBS = join(' ', map { '-l' . $_ } @{$ra_arlibs});
+} else {
+	$ARS_LIBS .= " -lpthread ";
+	$ARS_LIBS .= " -licuucbmc$LARCH -licui18nbmc$LARCH -licudatabmc$LARCH " if $ARSVERSION >= 7.0;
+}
+$AUTODEFINES .= " -DARS32 -DARS452 ";
+if( ($ARSVERSION >= 5.0) && ($^O eq 'linux') && $LARCH !~ /64/ ){
+	$AUTODEFINES .= " -malign-double ";
 }
 
-elsif ($ARSVERSION >= 6.3) {
-	$ARS_STATIC_LIB = $ARSAPI."/lib/libar.a";
-	$ARS_LIBS = "";
-	$PM->{'artypes.ph'} = '$(INST_LIBDIR)/artypes.ph';
-	if ($WINDOWS) {
-		$ARS_LIBS = join(' ', map { '-l' . $_ } @{$ra_arlibs});
-	} else {
-		$ARS_LIBS .= " -lpthread";
-	}
-	$AUTODEFINES .= " -DARS32 ";
-	$AUTODEFINES .= " -DARS452 " if($ARSVERSION >= 4.52);
-	if ( ($ARSVERSION >= 5.0) && ($^O eq 'linux') ) {
-		$AUTODEFINES .= " -malign-double ";
-	}
-}
 
-elsif ($ARSVERSION >= 6.0) {
-  $ARS_LIBS = "-lar -lnsl";
-  if ($WINDOWS) {
-    $ARS_LIBS = join(' ', map { '-l' . $_ } @{$ra_arlibs});
-  } else {
-    $ARS_LIBS .= " -lpthread";
-  }
-  $AUTODEFINES .= " -DARS32 ";	
-  $AUTODEFINES .= " -DARS452 " if($ARSVERSION >= 4.52);
-  if ( ($ARSVERSION >= 5.0) && ($^O eq 'linux') ) {
-    $AUTODEFINES .= " -malign-double ";
-  }
-}
-
-elsif($ARSVERSION >= 5.0) {
-  $ARS_LIBS = "-lar -lnsl";
-  if($ENCRYPT == 1) {
-    $ARS_LIBS = "-lar -larencrypt -lnsl";
-  }
-  if ($WINDOWS) {
-    $ARS_LIBS = join(' ', map { '-l' . $_ } @{$ra_arlibs});
-  } else {
-	$ARS_LIBS .= " -lnts" unless ($ARSVERSION >= 5.0);
-    $ARS_LIBS .= " -lpthread";
-  }
-  $AUTODEFINES .= " -DARS32 ";
-  $AUTODEFINES .= " -DARS452 " if($ARSVERSION >= 4.52);
-  if ( ($ARSVERSION >= 5.0) && ($^O eq 'linux') ) {
-    $AUTODEFINES .= " -malign-double ";
-  }
-}
-
-elsif($ARSVERSION >= 4.0) {
-  $ARS_LIBS = "-lar -lnsl";
-  if($ENCRYPT == 1) {
-    $ARS_LIBS = "-lar -larencrypt -lnsl";
-  } 
-  if ($WINDOWS) {
-    $ARS_LIBS = join(' ', map { '-l' . $_ } @{$ra_arlibs});
-  } else {
-    $ARS_LIBS .= " -lnts" unless ($ARSVERSION >= 5.0);
-    $ARS_LIBS .= " -lpthread";
-  }
-  $AUTODEFINES .= " -DARS32 ";	
-  $AUTODEFINES .= " -DARS452 " if($ARSVERSION >= 4.52);
-  if ( ($ARSVERSION >= 5.0) && ($^O eq 'linux') ) {
-    $AUTODEFINES .= " -malign-double ";
-  }
-}
-
-elsif($ARSVERSION >= 3.0 && $ARSVERSION < 4.0) {
-  $ARS_LIBS = "-lar -lnsl -lnts";
-  $AUTODEFINES .= " -DARS32 " if($ARSVERSION == 3.2);
-}
-
-elsif($ARSVERSION >= 2.0 && $ARSVERSION < 3.0) {
-  $ARS_LIBS = "-lar -lnsl -lnts -lntc";
-  $AUTODEFINES .= " -DARS20 " if($ARSVERSION == 2.0);
-}
 
 # e.g for 5.004_03 ..
 #
@@ -222,6 +205,8 @@ push(@extras, CAPI => 'TRUE') if ($] >= 5.005       &&
 				  (($Config{archname} =~ /-object\b/i) ||
                                    ($Config{archname} =~ /-multi-thread\b/i))
                                  );
+push(@extras, LDDLFLAGS => " -Wl,--exclude-symbols,\177arapi71_NULL_THUNK_DATA ") if $^O eq 'cygwin';
+
 
 if( $WINDOWS ){
   $ARS_LDPATH = qq{-L"$ARSAPI/lib"};
@@ -243,21 +228,24 @@ die "something went wrong when i ran \"$cmd\" (rv = $rv, expected 0)" unless ($r
 
 print "Converting C header files to perl modules ..\n";
 
-foreach ("ar", "arerrno", "nt", "nterrno") {
+
+
+
+foreach ("ar", "arerrno") {
 	my $headerFile = "${ARSAPI}/include/${_}.h";
 
-	# arsystem >= 5.0 doesnt have nt libs/hdrs anymore
-	if( ($ARSVERSION >= 5.0) && /^nt/ ) {
-		open(FD, "> ARS${_}-h.pm") || die "open: $!";
-		print FD "\# as of ARSystem 5.0, the NT (notifier) routines
-# are retired. so this file is just stubbed.
-1;\n";
-		close(FD);
-		open (FD, "> artypes.ph") || die "open: $!";
-		print FD "\# hackaround for artypes.h. do not remove.\n1;\n";
-		close(FD);
-		next;
-	}
+#	# arsystem >= 5.0 doesnt have nt libs/hdrs anymore
+#	if( ($ARSVERSION >= 5.0) && /^nt/ ) {
+#		open(FD, "> ARS/${_}-h.pm") || die "open: $!";
+#		print FD "\# as of ARSystem 5.0, the NT (notifier) routines
+## are retired. so this file is just stubbed.
+#1;\n";
+#		close(FD);
+#		open (FD, "> ARS/artypes.ph") || die "open: $!";
+#		print FD "\# hackaround for artypes.h. do not remove.\n1;\n";
+#		close(FD);
+#		next;
+#	}
 
 	# arsystem <= 6.0.3 doesnt have artypes.h
 
@@ -265,24 +253,24 @@ foreach ("ar", "arerrno", "nt", "nterrno") {
 
 	die "couldn't find $headerFile" if (! -e $headerFile);
 
-	# due to the endless confusion over h2ph, i'm including
-	# a known-good copy in the arsperl distribution. the 
-	# -d should make it create _h2ph_pre in the current 
-	# directory incase you never ran h2ph before (as root)
+#	# due to the endless confusion over h2ph, i'm including
+#	# a known-good copy in the arsperl distribution. the 
+#	# -d should make it create _h2ph_pre in the current 
+#	# directory incase you never ran h2ph before (as root)
 
 	if ($_ eq "artypes") {
-		$rv = system("$Config{'perlpath'} infra/h2ph -d . < $headerFile > ${_}.ph");
+		$rv = system("$Config{'perlpath'} infra/h2ph -d ./ARS < $headerFile > ARS/${_}.ph");
 	} else {
-		$rv = system("$Config{'perlpath'} infra/h2ph -d . < $headerFile > ARS${_}-h.pm");
+		$rv = system("$Config{'perlpath'} infra/h2ph -d ./ARS < $headerFile > ARS/${_}-h.pm");
 	}
 
-	unlink ('_h2ph_pre.ph');
-	open (FD, "> _h2ph_pre.ph") || die "open: $!";
-	print FD "1;\n";
-	close(FD);
+#	unlink ('ARS/_h2ph_pre.ph');
+#	open (FD, "> ARS/_h2ph_pre.ph") || die "open: $!";
+#	print FD "1;\n";
+#	close(FD);
 
-	if((! -e "ARS${_}-h.pm") || (-z "ARS${_}-h.pm")) {
-		open (FD, "> ARS${_}-h.pm") || die "open: $!";
+	if((! -e "ARS/${_}-h.pm") || (-z "ARS/${_}-h.pm")) {
+		open (FD, "> ARS/${_}-h.pm") || die "open: $!";
 		print FD "\# your perl installation was either missing the 'h2ph'
 \# utility or it was not in your path with you ran 'perl Makefile.PL'
 
@@ -296,13 +284,14 @@ printf "\tARSVERSION  = %.2f\n", $ARSVERSION;
 print "\tARSAPI      = $ARSAPI\n";
 print "\tAUTODEFINES = $AUTODEFINES\n";
 
-$PM->{'_h2ph_pre.ph'} = '$(INST_LIBDIR)/_h2ph_pre.ph';
+#$PM->{'ARS/_h2ph_pre.ph'} = '$(INST_LIBDIR)/ARS/_h2ph_pre.ph';
 
 WriteMakefile(
 	      'NAME'	=> 'ARS',
 	      'VERSION_FROM' => 'ARS.pm',
-	      'LIBS'	=> ["${ARS_LDPATH} ${ARS_LIBS}"],
-	      'OBJECT'  => q[ARS$(OBJ_EXT) support$(OBJ_EXT) supportrev$(OBJ_EXT) ].($ARSVERSION >= 5.0 ? q[supportrev_generated$(OBJ_EXT) ] : '').($WINDOWS ? '' : $ARS_STATIC_LIB),
+	      'LIBS'	=> $GNU_WIN ? [""] : ["${ARS_LDPATH} ${ARS_LIBS}"],
+	      'MYEXTLIB' => $WINDOWS ? ($GNU_WIN ? $ARS_LIBS : '') : $ARS_STATIC_LIB,
+	      'OBJECT' => q[ARS$(OBJ_EXT) support$(OBJ_EXT) supportrev$(OBJ_EXT) supportrev_generated$(OBJ_EXT) ],
 	      'INC'	=> "${INCLUDES}",
 	
 	      'PM' => $PM,
@@ -355,7 +344,7 @@ WriteMakefile(
 # don't fiddle with this
 
               'realclean' => {
-		 'FILES' => 'support.h ARSar-h.pm ARSarerrno-h.pm ARSnt-h.pm ARSnterrno-h.pm t/config.cache serverTypeInfoHints.h *~ .purify *-h.pm _h2ph_pre.ph artypes.ph ' 
+		 'FILES' => 'support.h ARS/ar-h.pm ARS/arerrno-h.pm ARS/_h2ph_pre.ph  t/config.cache serverTypeInfoHints.h *~ .purify ' 
 	      } 
 );
 
@@ -718,6 +707,18 @@ sub GenerateSupportDotH {
 		$code =~ /^AR_FILTER_ACTION_(\w+)/;
 		print FD "  { $code, \t\"\L$1\E\" },\n";
 	    }
+	}
+	elsif(/SIGNALTYPEMAP/) {
+	    print "\tProcessing AR_SIGNAL codes..\n";
+	    my($code, $line);
+	    foreach $line (grep (/^\#define\s+AR_SIGNAL.*/, @arh))
+	    {
+		$code = (split(/\s/, $line))[1];
+
+		print "\t\t$code\n" if $debug;
+		$code =~ /^AR_SIGNAL_(\w+)/;
+		print FD "  { $code, \t\"\L$1\E\" },\n";
+	    }
 	} else {
 	    print FD $_;
 	}
@@ -730,14 +731,15 @@ sub GenerateSupportDotH {
 }
 
 sub makeTestConfig {
-	my ($SERVER, $USERNAME, $PASSWORD);
-	my ($S, $U, $P) = ("", "", "");
+	my ($SERVER, $USERNAME, $PASSWORD, $TCPPORT);
+	my ($S, $U, $P, $T) = ("", "", "", 0);
 
 	if(-e "./t/config.cache") {
 		do './t/config.cache';
 		$S = &CCACHE::SERVER;
 		$U = &CCACHE::USERNAME;
 		$P = &CCACHE::PASSWORD;
+		$T = &CCACHE::TCPPORT;
 	}
 
 	print "=== ARSperl 'make test' configuration. ===
@@ -754,23 +756,31 @@ production ARSystem server.
 
 ";
 	
+	( $SERVER, $USERNAME, $PASSWORD ) = ( '', '', '' );	
 	print "Server Name [$S]: ";
-	chomp($SERVER = <STDIN>);
+	chomp($SERVER = $ARSPERLTEST_SERVER || <STDIN>);
 	if($SERVER eq "") {
 		$SERVER = $S if ($S ne "");
 	} 
 
 	print "Admin Username [$U]: ";
-	chomp($USERNAME = <STDIN>);
-        if($USERNAME eq "") {
-                $USERNAME = $U if ($U ne "");
-        } 
+	chomp($USERNAME = $ARSPERLTEST_USERNAME || <STDIN>);
+	if($USERNAME eq "") {
+		$USERNAME = $U if ($U ne "");
+	} 
 
 	print "Admin Password [$P]: ";
-	chomp($PASSWORD = <STDIN>);
-        if($PASSWORD eq "") {
-                $PASSWORD = $P if ($P ne "");
-        } 
+	chomp($PASSWORD = defined($ARSPERLTEST_PASSWORD) ? $ARSPERLTEST_PASSWORD : <STDIN>);
+	if($PASSWORD eq "") {
+		$PASSWORD = $P if ($P ne "");
+	} 
+
+	print "TCP Port [$T]: ";
+	chomp($TCPPORT = defined($ARSPERLTEST_TCPPORT) ? $ARSPERLTEST_TCPPORT : <STDIN>);
+	if($TCPPORT eq "") {
+		$TCPPORT = $T if ($T ne "");
+	} 
+	$TCPPORT = 0 if ! $TCPPORT;
 
 	#print "Storing $SERVER / $USERNAME / $PASSWORD ..\n";
 	open (FD, "> ./t/config.cache") || die "open failed: $!";
@@ -779,6 +789,7 @@ production ARSystem server.
 	print FD "sub SERVER { \"$SERVER\" ; }\n";
 	print FD "sub USERNAME { \"$USERNAME\" ; }\n";
 	print FD "sub PASSWORD { \"$PASSWORD\" ; }\n";
+	print FD "sub TCPPORT { $TCPPORT ; }\n";
 	print FD "1;\n";
 	close(FD);
 

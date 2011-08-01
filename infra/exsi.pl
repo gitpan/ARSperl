@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 #
-# $Header: /cvsroot/arsperl/ARSperl/infra/exsi.pl,v 1.2 2007/09/13 22:50:26 tstapff Exp $
+# $Header: /cvsroot/arsperl/ARSperl/infra/exsi.pl,v 1.8 2011/07/29 13:05:28 tstapff Exp $
 #
 # NAME
 #   exsi.pl < ar.h > server_info_type_hints.h
@@ -15,6 +15,21 @@
 #   jcmurphy@jeffmurphy.org
 #
 # $Log: exsi.pl,v $
+# Revision 1.8  2011/07/29 13:05:28  tstapff
+# arsystem 7.6.4 port
+#
+# Revision 1.6  2009/12/14 17:30:56  jeffmurphy
+# more fiddling with exsi.pl: removed skip of MAX_ATTACH_SIZE, reworded warning
+#
+# Revision 1.5  2009/12/14 17:25:34  jeffmurphy
+# changed die to warn. due to watch serverinfotypehints is searched, shouldnt affect anything if theres a gap. sf bug id 2914262
+#
+# Revision 1.4  2009/03/31 17:41:18  tstapff
+# arsystem 7.5 port, AR*Image functions
+#
+# Revision 1.3  2008/09/24 13:03:14  tstapff
+# bugfix for serverTypeInfoHints.h
+#
 # Revision 1.2  2007/09/13 22:50:26  tstapff
 # arsystem 7.1 port
 #
@@ -24,18 +39,63 @@
 #
 
 use strict;
+my $D  = 0;
 
 header();
 
+
+my $ct = 0;  # counter for completeness check
+my $apiVersion;
+
 while(<>) {
-#	print;
+	print if $D;
 	chomp;
 	
+	$apiVersion = $1 if /#define\s+AR_CURRENT_API_VERSION\s+(\d+)/;
+
 	# jump thru hoops
 
-	if(/\#define\s+(AR_SERVER_INFO_\S+)\s+(\d+)\s*\/\*\s+(\S+)\s+(\S+)\s/) {
-		my ($sin, $siv, $sit, $sit2) = ($1, $2, $3, $4);
-		# name value type type2
+	my ($sin, $siv, $sit, $sit2);
+	# name value type type2
+
+	while( 1 ){
+		if(/\#define\s+(AR_SERVER_INFO_\S+)\s+(\d+)\s*\/\*\s*(\w+)[-;(\s]+(\S+)?/) {
+			($sin, $siv, $sit, $sit2) = ($1, $2, $3, $4);
+#			print STDERR "\$sin <", $sin, ">  \$siv <", $siv, ">  \$sit <", $sit, ">  \$sit2 <", $sit2, ">\n";  # _DEBUG_
+		}elsif(/\#define\s+(AR_SERVER_INFO_\S+)\s+(\d+)\s*$/){
+			($sin, $siv) = ($1, $2);
+			$_ = <>;
+			if( /^\s*\/\*\s+(\S+)\s+(\S+)?/) {
+				($sit, $sit2) = ($1, $2);
+			}else{
+				next;
+			}
+		}
+		last;
+	}
+
+	if( defined $sin && defined $siv && defined $sit ){
+		print "sin $sin siv $siv sit $sit\n" if $D;
+		if( $apiVersion == 14 && $ct == 324 ){
+			$ct += 9;
+		}elsif( $apiVersion >= 17 && $ct == 326 ){
+			$ct += 4;
+		}elsif( $apiVersion >= 17 && $ct == 339 ){
+			$ct += 2;
+		}else{
+			++$ct;
+		}
+#		print STDERR "($ct) sin $sin siv $siv sit $sit\n";
+		if ($siv != $ct) {
+			if( $siv <= 324 ){
+				warn "!!! ERROR: Cannot determine type for AR_SERVER_INFO constant $ct !!!";
+			}else{
+				warn "WARNING: gap in enumeration for $sin expected $ct got $siv. it's OK to ignore this.";
+			}
+			$ct = $siv;
+		}
+
+		next if $sit eq 'deprecated';
 
 		# jump thru some more hoops
 
@@ -65,6 +125,22 @@ while(<>) {
 		$sit = "int" if $sin eq "AR_SERVER_INFO_DB_MAX_TEXT_SIZE";
 		$sit = "char" if $sin eq "AR_SERVER_INFO_GUID_PREFIX";
 
+		$sit = "char" if $sin eq "AR_SERVER_INFO_FT_COLLECTION_DIR";     # deprecated in 7.5
+		$sit = "char" if $sin eq "AR_SERVER_INFO_FT_CONFIGURATION_DIR";  # deprecated in 7.5
+		$sit = "char" if $sin eq "AR_SERVER_INFO_FT_TEMP_DIR";           # deprecated in 7.5
+
+		$sit = "int" if $sin eq "AR_SERVER_INFO_LICENSE_USAGE";
+		$sit = "int" if $sin eq "AR_SERVER_INFO_MAX_CLIENT_MANAGED_TRANSACTIONS";
+		$sit = "int" if $sin eq "AR_SERVER_INFO_CLIENT_MANAGED_TRANSACTION_TIMEOUT";
+
+		$sit = "int" if $sin eq "AR_SERVER_INFO_MAX_ATTACH_SIZE";
+		$sit = "int" if $sin eq "AR_SERVER_INFO_ATRIUM_SSO_AUTHENTICATION";
+
+		$sit = "int" if $sin eq "AR_SERVER_INFO_MFS_TITLE_FIELD_WEIGHT";         # 327
+		$sit = "int" if $sin eq "AR_SERVER_INFO_MFS_ENVIRONMENT_FIELD_WEIGHT";   # 328
+		$sit = "int" if $sin eq "AR_SERVER_INFO_MFS_KEYWORDS_FIELD_WEIGHT";      # 329
+
+		$sit = "int" if $sin eq "AR_SERVER_INFO_OVERLAY_MODE";                   # 341
 
 		#print "\t/*$sin [$siv] is an $sit*/\n";
 
